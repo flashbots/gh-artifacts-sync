@@ -1,7 +1,7 @@
 # gh-artifacts-sync
 
 Subscribes to Github workflow events, downloads matching artifacts and
-synchronises them to the configured destinations.
+synchronise them to the configured destinations.
 
 Supported destinations:
 
@@ -51,4 +51,33 @@ harvest:
             - type: gcp.artifactregistry.generic
               path: projects/${GCP_PROJECT}$/locations/${GCP_REGION}/repositories/binary
               package: ${ORGANISATION}.super-cool-app.x86_64
+```
+
+## CLI parameters
+
+```haskell
+NAME:
+   gh-artifacts-sync serve - run gh-artifacts-sync server
+
+USAGE:
+   gh-artifacts-sync serve [command options]
+
+OPTIONS:
+   DIR
+
+   --dir-artifacts path, --dir.artifacts path  a path to the directory where downloaded artifacts will be temporarily stored (default: "./artifacts") [$GH_ARTIFACTS_SYNC_DIR_ARTIFACTS]
+   --dir-jobs path, --dir.jobs path            a path to the directory where scheduled jobs will be persisted (default: "./jobs") [$GH_ARTIFACTS_SYNC_DIR_JOBS]
+
+   GITHUB
+
+   --github-app-id id, --github.app.id id                        github app id (default: 0) [$GH_ARTIFACTS_SYNC_GITHUB_APP_ID]
+   --github-installation-id id, --github.app.installation_id id  installation id of the github app (default: 0) [$GH_ARTIFACTS_SYNC_GITHUB_INSTALLATION_ID]
+   --github-private-key key, --github.app.private_key key        private key of the github app [$GH_ARTIFACTS_SYNC_GITHUB_PRIVATE_KEY]
+   --github-private-key-path path                                path to a .pem file with private `key` of the github app [$GH_ARTIFACTS_SYNC_GITHUB_PRIVATE_KEY_PATH]
+   --github-webhook-secret token, --github.webhook_secret token  secret token for the github webhook [$GH_ARTIFACTS_SYNC_GITHUB_WEBHOOK_SECRET]
+   --github-webhook-secret-path path                             path to a file with secret token for the github webhook [$GH_ARTIFACTS_SYNC_GITHUB_WEBHOOK_SECRET_PATH]
+
+   SERVER
+
+   --server-listen-address host:port, --server.listen_address host:port  host:port for the server to listen on (default: "0.0.0.0:8080") [$GH_ARTIFACTS_SYNC_SERVER_LISTEN_ADDRESS]
 ```
