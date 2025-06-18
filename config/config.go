@@ -11,11 +11,11 @@ import (
 )
 
 type Config struct {
-	Dir          *Dir                   `yaml:"dir"        json:"dir"`
-	Github       *Github                `yaml:"github"     json:"github"`
-	Log          *Log                   `yaml:"log"        json:"log"`
-	Repositories map[string]*Repository `yaml:"repository" json:"repository"`
-	Server       *Server                `yaml:"server"     json:"server"`
+	Dir          *Dir                   `yaml:"dir"          json:"dir"`
+	Github       *Github                `yaml:"github"       json:"github"`
+	Log          *Log                   `yaml:"log"          json:"log"`
+	Repositories map[string]*Repository `yaml:"repositories" json:"repositories"`
+	Server       *Server                `yaml:"server"       json:"server"`
 }
 
 var (
