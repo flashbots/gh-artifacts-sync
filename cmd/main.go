@@ -60,7 +60,7 @@ func main() {
 
 	app := &cli.App{
 		Name:    "gh-artifacts-sync",
-		Usage:   "Listens to github workflow events and downloads produced artifacts",
+		Usage:   "Listens to github events and synchronises artifacts, packages and releases",
 		Version: version,
 
 		Flags:          flags,

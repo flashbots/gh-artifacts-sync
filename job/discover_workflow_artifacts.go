@@ -8,40 +8,40 @@ import (
 	"github.com/google/go-github/v72/github"
 )
 
-const TypeDiscoverArtifacts = "discover-artifacts"
+const TypeDiscoverWorkflowArtifacts = "discover-workflow-artifacts"
 
-type DiscoverArtifacts struct {
+type DiscoverWorkflowArtifacts struct {
 	Meta *Meta `json:"meta"`
 
 	WorkflowRunEvent *github.WorkflowRunEvent `json:"workflow_run_event"`
 }
 
-func NewDiscoverArtifacts(e *github.WorkflowRunEvent) *DiscoverArtifacts {
+func NewDiscoverWorkflowArtifacts(e *github.WorkflowRunEvent) *DiscoverWorkflowArtifacts {
 	var id string
 	if e.WorkflowRun.ID != nil {
-		id = fmt.Sprintf("%s-%d", TypeDiscoverArtifacts, *e.WorkflowRun.ID)
+		id = fmt.Sprintf("%s-%d", TypeDiscoverWorkflowArtifacts, *e.WorkflowRun.ID)
 	} else {
-		id = fmt.Sprintf("%s-noid-%d", TypeDiscoverArtifacts, rand.Int64())
+		id = fmt.Sprintf("%s-noid-%d", TypeDiscoverWorkflowArtifacts, rand.Int64())
 	}
 
-	return &DiscoverArtifacts{
+	return &DiscoverWorkflowArtifacts{
 		Meta: &Meta{
 			ID:   id,
-			Type: TypeDiscoverArtifacts,
+			Type: TypeDiscoverWorkflowArtifacts,
 		},
 
 		WorkflowRunEvent: e,
 	}
 }
 
-func (j *DiscoverArtifacts) meta() *Meta {
+func (j *DiscoverWorkflowArtifacts) meta() *Meta {
 	if j == nil {
 		return nil
 	}
 	return j.Meta
 }
 
-func (j *DiscoverArtifacts) Owner() string {
+func (j *DiscoverWorkflowArtifacts) Owner() string {
 	if j == nil ||
 		j.WorkflowRunEvent == nil ||
 		j.WorkflowRunEvent.Repo == nil ||
@@ -53,7 +53,7 @@ func (j *DiscoverArtifacts) Owner() string {
 	return *j.WorkflowRunEvent.Repo.Owner.Login
 }
 
-func (j *DiscoverArtifacts) Repo() string {
+func (j *DiscoverWorkflowArtifacts) Repo() string {
 	if j == nil ||
 		j.WorkflowRunEvent == nil ||
 		j.WorkflowRunEvent.Repo == nil ||
@@ -64,7 +64,7 @@ func (j *DiscoverArtifacts) Repo() string {
 	return *j.WorkflowRunEvent.Repo.Name
 }
 
-func (j *DiscoverArtifacts) WorkflowFile() string {
+func (j *DiscoverWorkflowArtifacts) WorkflowFile() string {
 	if j == nil ||
 		j.WorkflowRunEvent == nil ||
 		j.WorkflowRunEvent.Workflow == nil ||
@@ -75,7 +75,7 @@ func (j *DiscoverArtifacts) WorkflowFile() string {
 	return strings.TrimPrefix(*j.WorkflowRunEvent.Workflow.Path, ".github/workflows/")
 }
 
-func (j *DiscoverArtifacts) WorkflowRunID() int64 {
+func (j *DiscoverWorkflowArtifacts) WorkflowRunID() int64 {
 	if j == nil ||
 		j.WorkflowRunEvent == nil ||
 		j.WorkflowRunEvent.WorkflowRun == nil ||

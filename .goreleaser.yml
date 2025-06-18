@@ -30,7 +30,11 @@ dockers:
     goos: linux
     use: buildx
     build_flag_templates:
-      - --platform=linux/amd64
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.version={{.Tag}}"
     image_templates:
       - "ghcr.io/flashbots/gh-artifacts-sync:{{ .Tag }}-amd64"
 
@@ -39,7 +43,11 @@ dockers:
     goos: linux
     use: buildx
     build_flag_templates:
-      - --platform=linux/arm64
+      - "--platform=linux/arm64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.version={{.Tag}}"
     image_templates:
       - "ghcr.io/flashbots/gh-artifacts-sync:{{ .Tag }}-arm64"
 
@@ -48,3 +56,7 @@ docker_manifests:
     image_templates:
       - "ghcr.io/flashbots/gh-artifacts-sync:{{ .Tag }}-amd64"
       - "ghcr.io/flashbots/gh-artifacts-sync:{{ .Tag }}-arm64"
+
+# after:
+#   hooks:
+#     - docker save "ghcr.io/flashbots/gh-artifacts-sync:{{ .Tag }}" --output ./gh-artifacts-sync-{{ .Tag }}.tar

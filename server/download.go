@@ -18,7 +18,7 @@ import (
 
 func (s *Server) download(
 	ctx context.Context,
-	j *job.SyncArtifact,
+	j *job.SyncWorkflowArtifact,
 ) (string, error) {
 	l := logutils.LoggerFromContext(ctx)
 
@@ -83,7 +83,7 @@ func (s *Server) download(
 
 		if res.StatusCode != http.StatusOK {
 			err = fmt.Errorf("download failed with status: %d", res.StatusCode)
-			l.Error("Failed to download artifact",
+			l.Error("Failed to download workflow artifact",
 				zap.Error(err),
 			)
 			return "", err
@@ -96,18 +96,18 @@ func (s *Server) download(
 		zname = filepath.Join(path, j.ArtifactName()+".zip") // gh sends zips only
 		zfile, err := os.OpenFile(zname, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0640)
 		if err != nil {
-			l.Error("Failed to create artifact zip file",
+			l.Error("Failed to create workflow artifact zip file",
 				zap.Error(err),
 				zap.String("zip_file_name", zname),
 			)
 			return "", errors.Join(err, zfile.Close())
 		}
 
-		l.Debug("Downloading artifact zip file...")
+		l.Debug("Downloading workflow artifact zip file...")
 		start := time.Now()
 
 		if _, err = io.Copy(zfile, stream); err != nil {
-			l.Error("Failed to write artifact zip file",
+			l.Error("Failed to write workflow artifact zip file",
 				zap.Error(err),
 				zap.String("zip_file_name", zname),
 			)
@@ -115,14 +115,14 @@ func (s *Server) download(
 		}
 
 		if err := zfile.Close(); err != nil {
-			l.Error("Failed to close artifacts zip file",
+			l.Error("Failed to close workflow artifacts zip file",
 				zap.Error(err),
 				zap.String("zip_file_name", zname),
 			)
 			return "", err
 		}
 
-		l.Info("Downloaded artifact zip file",
+		l.Info("Downloaded workflow artifact zip file",
 			zap.String("zip_file_name", zname),
 			zap.Duration("duration", time.Since(start)),
 		)

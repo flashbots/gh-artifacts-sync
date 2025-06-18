@@ -9,9 +9,9 @@ import (
 	"github.com/google/go-github/v72/github"
 )
 
-const TypeSyncArtifact = "sync-artifact"
+const TypeSyncWorkflowArtifact = "sync-workflow-artifact"
 
-type SyncArtifact struct {
+type SyncWorkflowArtifact struct {
 	Meta *Meta `json:"meta"`
 
 	Artifact     *github.Artifact      `json:"artifact"`
@@ -20,27 +20,27 @@ type SyncArtifact struct {
 	WorkflowRun  *github.WorkflowRun   `json:"workflow_run"`
 }
 
-func NewSyncArtifact(
+func NewSyncWorkflowArtifact(
 	artifact *github.Artifact,
 	version string,
 	destinations []*config.Destination,
 	workflowRun *github.WorkflowRun,
-) *SyncArtifact {
+) *SyncWorkflowArtifact {
 	var id string
 	if artifact != nil &&
 		artifact.ID != nil &&
 		artifact.WorkflowRun != nil &&
 		artifact.WorkflowRun.ID != nil {
 		// ---
-		id = fmt.Sprintf("%s-%d-%d", TypeSyncArtifact, *artifact.WorkflowRun.ID, *artifact.ID)
+		id = fmt.Sprintf("%s-%d-%d", TypeSyncWorkflowArtifact, *artifact.WorkflowRun.ID, *artifact.ID)
 	} else {
-		id = fmt.Sprintf("%s-noid-noid-%d", TypeSyncArtifact, rand.Int64())
+		id = fmt.Sprintf("%s-noid-noid-%d", TypeSyncWorkflowArtifact, rand.Int64())
 	}
 
-	return &SyncArtifact{
+	return &SyncWorkflowArtifact{
 		Meta: &Meta{
 			ID:   id,
-			Type: TypeSyncArtifact,
+			Type: TypeSyncWorkflowArtifact,
 		},
 
 		Artifact:     artifact,
@@ -50,14 +50,14 @@ func NewSyncArtifact(
 	}
 }
 
-func (j *SyncArtifact) meta() *Meta {
+func (j *SyncWorkflowArtifact) meta() *Meta {
 	if j == nil {
 		return nil
 	}
 	return j.Meta
 }
 
-func (j *SyncArtifact) ArtifactName() string {
+func (j *SyncWorkflowArtifact) ArtifactName() string {
 	if j == nil ||
 		j.Artifact == nil ||
 		j.Artifact.Name == nil {
@@ -67,7 +67,7 @@ func (j *SyncArtifact) ArtifactName() string {
 	return *j.Artifact.Name
 }
 
-func (j *SyncArtifact) ArtifactID() int64 {
+func (j *SyncWorkflowArtifact) ArtifactID() int64 {
 	if j == nil ||
 		j.Artifact == nil ||
 		j.Artifact.ID == nil {
@@ -76,7 +76,7 @@ func (j *SyncArtifact) ArtifactID() int64 {
 	return *j.Artifact.ID
 }
 
-func (j *SyncArtifact) RepoOwner() string {
+func (j *SyncWorkflowArtifact) RepoOwner() string {
 	if j == nil ||
 		j.Artifact == nil ||
 		j.Artifact.URL == nil {
@@ -89,7 +89,7 @@ func (j *SyncArtifact) RepoOwner() string {
 	return parts[0]
 }
 
-func (j *SyncArtifact) Repo() string {
+func (j *SyncWorkflowArtifact) Repo() string {
 	if j == nil ||
 		j.Artifact == nil ||
 		j.Artifact.URL == nil {
@@ -102,7 +102,7 @@ func (j *SyncArtifact) Repo() string {
 	return parts[1]
 }
 
-func (j *SyncArtifact) URL() string {
+func (j *SyncWorkflowArtifact) URL() string {
 	if j == nil ||
 		j.Artifact == nil ||
 		j.Artifact.URL == nil {
@@ -112,7 +112,7 @@ func (j *SyncArtifact) URL() string {
 	return *j.Artifact.URL
 }
 
-func (j *SyncArtifact) WorkflowRunID() int64 {
+func (j *SyncWorkflowArtifact) WorkflowRunID() int64 {
 	if j == nil ||
 		j.Artifact == nil ||
 		j.Artifact.WorkflowRun == nil ||

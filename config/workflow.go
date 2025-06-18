@@ -8,15 +8,15 @@ import (
 	"github.com/flashbots/gh-artifacts-sync/utils"
 )
 
-type Harvest struct {
+var (
+	errWorkflowInvalidRegexp = errors.New("invalid regexp")
+)
+
+type Workflow struct {
 	Artifacts map[string]*Artifact `yaml:"artifacts" json:"artifacts"`
 }
 
-var (
-	errHarvestInvalidRegexp = errors.New("invalid regexp")
-)
-
-func (cfg *Harvest) Validate() error {
+func (cfg *Workflow) Validate() error {
 	errs := make([]error, 0)
 
 	for regex, a := range cfg.Artifacts {
@@ -24,7 +24,7 @@ func (cfg *Harvest) Validate() error {
 			a.regexp = re
 		} else {
 			errs = append(errs, fmt.Errorf("%w: %s: %w",
-				errHarvestInvalidRegexp, regex, err,
+				errWorkflowInvalidRegexp, regex, err,
 			))
 		}
 	}

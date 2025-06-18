@@ -41,14 +41,14 @@ func Load(path string) (Job, error) {
 	var job Job
 
 	switch header.Meta.Type {
-	case TypeDiscoverArtifacts:
-		j := &DiscoverArtifacts{}
+	case TypeDiscoverWorkflowArtifacts:
+		j := &DiscoverWorkflowArtifacts{}
 		if err := json.Unmarshal(bytes, j); err != nil {
 			return nil, err
 		}
 		job = j
-	case TypeSyncArtifact:
-		j := &SyncArtifact{}
+	case TypeSyncWorkflowArtifact:
+		j := &SyncWorkflowArtifact{}
 		if err := json.Unmarshal(bytes, j); err != nil {
 			return nil, err
 		}

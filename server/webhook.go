@@ -30,7 +30,7 @@ func (s *Server) webhook(w http.ResponseWriter, r *http.Request) {
 
 	payload, err := github.ValidatePayload(r, []byte(s.cfg.Github.WebhookSecret))
 	if err != nil {
-		l.Warn("Failed to validate payload",
+		l.Warn("Failed to validate webhook payload",
 			zap.Error(err),
 		)
 		w.WriteHeader(http.StatusBadRequest)
@@ -39,12 +39,17 @@ func (s *Server) webhook(w http.ResponseWriter, r *http.Request) {
 
 	event, err := github.ParseWebHook(github.WebHookType(r), payload)
 	if err != nil {
-		l.Warn("Failed to parse webhook",
+		l.Warn("Failed to parse webhook event",
 			zap.Error(err),
 		)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+
+	l.Debug("Received webhook event",
+		zap.String("event_type", reflect.TypeOf(event).String()),
+		zap.Any("event", event),
+	)
 
 	switch e := event.(type) {
 	case *github.WorkflowRunEvent:
@@ -98,14 +103,14 @@ func (s *Server) processWorkflowEvent(ctx context.Context, e *github.WorkflowRun
 		return nil
 	}
 
-	workflows, repoIsConfigured := s.cfg.Harvest[must(e.Repo.FullName)]
+	repo, repoIsConfigured := s.cfg.Repositories[must(e.Repo.FullName)]
 	if !repoIsConfigured {
 		l.Debug("Ignoring workflow event b/c we don't have configuration for this repo")
 		return nil
 	}
 
 	workflow := strings.TrimPrefix(must(e.WorkflowRun.Path), ".github/workflows/")
-	if _, workflowIsConfigured := workflows[workflow]; !workflowIsConfigured {
+	if _, workflowIsConfigured := repo.Workflows[workflow]; !workflowIsConfigured {
 		l.Debug("Ignoring workflow event b/c we don't have configuration for this workflow",
 			zap.Int64("workflow_id", *e.WorkflowRun.ID),
 			zap.String("repo", must(e.Repo.FullName)),
@@ -114,7 +119,7 @@ func (s *Server) processWorkflowEvent(ctx context.Context, e *github.WorkflowRun
 		return nil
 	}
 
-	fname, err := job.Save(job.NewDiscoverArtifacts(e), s.cfg.Dir.Jobs)
+	fname, err := job.Save(job.NewDiscoverWorkflowArtifacts(e), s.cfg.Dir.Jobs)
 	if err != nil {
 		l.Error("Failed to persist discover-artifacts job",
 			zap.Error(err),

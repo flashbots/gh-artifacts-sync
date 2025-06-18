@@ -33,7 +33,7 @@ func (s *Server) scheduleJobs(_ time.Time) {
 		}
 		j, err := job.Load(path)
 		if err != nil {
-			j = job.NewCleanupUnparseable(path, err)
+			j = job.NewCleanupUnparseableJob(path, err)
 		}
 		s.jobs <- j
 		s.jobInFlight.Add(1)
@@ -57,12 +57,14 @@ func (s *Server) handleJob(ctx context.Context, j job.Job) {
 
 	var err error
 	switch j := j.(type) {
-	case *job.CleanupUnparseable:
-		err = s.handleCleanupUnparseable(ctx, j)
-	case *job.DiscoverArtifacts:
-		err = s.handleDiscoverArtifacts(ctx, j)
-	case *job.SyncArtifact:
-		err = s.handleSyncArtifact(ctx, j)
+	case *job.CleanupUnparseableJob:
+		err = s.handleCleanupUnparseableJob(ctx, j)
+
+	case *job.DiscoverWorkflowArtifacts:
+		err = s.handleDiscoverWorkflowArtifacts(ctx, j)
+
+	case *job.SyncWorkflowArtifact:
+		err = s.handleSyncWorkflowArtifact(ctx, j)
 	}
 
 	if err != nil {

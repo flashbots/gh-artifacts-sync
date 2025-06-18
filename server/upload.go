@@ -22,7 +22,7 @@ import (
 
 func (s *Server) upload(
 	ctx context.Context,
-	j *job.SyncArtifact,
+	j *job.SyncWorkflowArtifact,
 	zname string,
 ) error {
 	errs := make([]error, 0)
@@ -47,7 +47,7 @@ func (s *Server) upload(
 
 func (s *Server) uploadToGcpArtifactRegistryGeneric(
 	ctx context.Context,
-	j *job.SyncArtifact,
+	j *job.SyncWorkflowArtifact,
 	zname string,
 	dst *config.Destination,
 ) error {

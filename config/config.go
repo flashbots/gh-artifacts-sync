@@ -11,12 +11,11 @@ import (
 )
 
 type Config struct {
-	Harvest map[string]map[string]*Harvest `yaml:"harvest"`
-
-	Dir    *Dir    `yaml:"dir"    json:"dir"`
-	Github *Github `yaml:"github" json:"github"`
-	Log    *Log    `yaml:"log"    json:"log"`
-	Server *Server `yaml:"server" json:"server"`
+	Dir          *Dir                   `yaml:"dir"        json:"dir"`
+	Github       *Github                `yaml:"github"     json:"github"`
+	Log          *Log                   `yaml:"log"        json:"log"`
+	Repositories map[string]*Repository `yaml:"repository" json:"repository"`
+	Server       *Server                `yaml:"server"     json:"server"`
 }
 
 var (
@@ -53,8 +52,8 @@ func (cfg *Config) SoftMerge(another *Config) {
 		return
 	}
 
-	if another.Harvest != nil {
-		cfg.Harvest = another.Harvest
+	if another.Repositories != nil {
+		cfg.Repositories = another.Repositories
 	}
 }
 

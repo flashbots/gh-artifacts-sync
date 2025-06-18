@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func (s *Server) handleDiscoverArtifacts(ctx context.Context, j *job.DiscoverArtifacts) error {
+func (s *Server) handleDiscoverWorkflowArtifacts(ctx context.Context, j *job.DiscoverWorkflowArtifacts) error {
 	l := logutils.LoggerFromContext(ctx).With(
 		zap.String("owner", j.Owner()),
 		zap.String("repo", j.Repo()),
@@ -22,13 +22,13 @@ func (s *Server) handleDiscoverArtifacts(ctx context.Context, j *job.DiscoverArt
 
 	l.Info("Discovering artifacts of the workflow...")
 
-	workflows, repoIsConfigured := s.cfg.Harvest[j.Owner()+"/"+j.Repo()]
+	repo, repoIsConfigured := s.cfg.Repositories[j.Owner()+"/"+j.Repo()]
 	if !repoIsConfigured {
 		l.Info("Ignoring workflow b/c we don't have configuration for this repo")
 		return nil
 	}
 
-	harvest, workflowIsConfigured := workflows[j.WorkflowFile()]
+	workflow, workflowIsConfigured := repo.Workflows[j.WorkflowFile()]
 	if !workflowIsConfigured {
 		l.Info("Ignoring workflow b/c we don't have configuration for this workflow")
 		return nil
@@ -44,7 +44,7 @@ func (s *Server) handleDiscoverArtifacts(ctx context.Context, j *job.DiscoverArt
 			Page: page,
 		})
 		if err != nil {
-			l.Error("Failed to list artifacts",
+			l.Error("Failed to list workflow artifacts",
 				zap.Error(err),
 			)
 			return err
@@ -60,23 +60,23 @@ func (s *Server) handleDiscoverArtifacts(ctx context.Context, j *job.DiscoverArt
 
 	for _, ghArtifact := range artifacts {
 		if err := s.sanitiseArtifact(ghArtifact); err != nil {
-			l.Warn("Invalid github artifact, skipping",
+			l.Warn("Invalid workflow artifact, skipping...",
 				zap.Error(err),
 			)
 			continue
 		}
 
 		if *ghArtifact.Expired {
-			l.Info("Artifact expired, skipping...",
+			l.Info("Workflow artifact expired, skipping...",
 				zap.String("artifact", must(ghArtifact.Name)),
 			)
 			continue
 		}
 
-		for _, hArtifact := range harvest.Artifacts {
+		for _, cfgArtifact := range workflow.Artifacts {
 			var version string
 
-			matches := hArtifact.Regexp().FindStringSubmatch(
+			matches := cfgArtifact.Regexp().FindStringSubmatch(
 				filepath.Base(*ghArtifact.Name),
 			)
 			if len(matches) == 0 {
@@ -89,22 +89,22 @@ func (s *Server) handleDiscoverArtifacts(ctx context.Context, j *job.DiscoverArt
 				version = *ghArtifact.WorkflowRun.HeadSHA
 			}
 
-			j := job.NewSyncArtifact(
+			j := job.NewSyncWorkflowArtifact(
 				ghArtifact,
 				version,
-				hArtifact.Destinations,
+				cfgArtifact.Destinations,
 				j.WorkflowRunEvent.WorkflowRun,
 			)
 
 			fname, err := job.Save(j, s.cfg.Dir.Jobs)
 			if err != nil {
-				l.Error("Failed to persist sync-artifact job",
+				l.Error("Failed to persist "+job.TypeSyncWorkflowArtifact+" job",
 					zap.Error(err),
 				)
 				errs = append(errs, err)
 			}
 
-			l.Info("Persisted sync-artifact job",
+			l.Info("Persisted "+job.TypeSyncWorkflowArtifact+" job",
 				zap.String("artifact", must(ghArtifact.Name)),
 				zap.String("job", fname),
 			)
