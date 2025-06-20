@@ -41,6 +41,17 @@ func (j *DiscoverWorkflowArtifacts) meta() *Meta {
 	return j.Meta
 }
 
+func (j *DiscoverWorkflowArtifacts) FullName() string {
+	if j == nil ||
+		j.WorkflowRunEvent == nil ||
+		j.WorkflowRunEvent.Repo == nil ||
+		j.WorkflowRunEvent.Repo.FullName == nil {
+		// ---
+		return ""
+	}
+	return *j.WorkflowRunEvent.Repo.FullName
+}
+
 func (j *DiscoverWorkflowArtifacts) Owner() string {
 	if j == nil ||
 		j.WorkflowRunEvent == nil ||

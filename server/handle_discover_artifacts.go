@@ -12,7 +12,10 @@ import (
 	"go.uber.org/zap"
 )
 
-func (s *Server) handleDiscoverWorkflowArtifacts(ctx context.Context, j *job.DiscoverWorkflowArtifacts) error {
+func (s *Server) handleDiscoverWorkflowArtifacts(
+	ctx context.Context,
+	j *job.DiscoverWorkflowArtifacts,
+) error {
 	l := logutils.LoggerFromContext(ctx).With(
 		zap.String("owner", j.Owner()),
 		zap.String("repo", j.Repo()),
@@ -22,7 +25,7 @@ func (s *Server) handleDiscoverWorkflowArtifacts(ctx context.Context, j *job.Dis
 
 	l.Info("Discovering artifacts of the workflow...")
 
-	repo, repoIsConfigured := s.cfg.Repositories[j.Owner()+"/"+j.Repo()]
+	repo, repoIsConfigured := s.cfg.Repositories[j.FullName()]
 	if !repoIsConfigured {
 		l.Info("Ignoring workflow b/c we don't have configuration for this repo")
 		return nil
@@ -40,9 +43,9 @@ func (s *Server) handleDiscoverWorkflowArtifacts(ctx context.Context, j *job.Dis
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 
-		list, res, err := s.github.Actions.ListWorkflowRunArtifacts(ctx, j.Owner(), j.Repo(), j.WorkflowRunID(), &github.ListOptions{
-			Page: page,
-		})
+		list, res, err := s.github.Actions.ListWorkflowRunArtifacts(
+			ctx, j.Owner(), j.Repo(), j.WorkflowRunID(), &github.ListOptions{Page: page},
+		)
 		if err != nil {
 			l.Error("Failed to list workflow artifacts",
 				zap.Error(err),
@@ -96,18 +99,16 @@ func (s *Server) handleDiscoverWorkflowArtifacts(ctx context.Context, j *job.Dis
 				j.WorkflowRunEvent.WorkflowRun,
 			)
 
-			fname, err := job.Save(j, s.cfg.Dir.Jobs)
-			if err != nil {
-				l.Error("Failed to persist "+job.TypeSyncWorkflowArtifact+" job",
+			if fname, err := job.Save(j, s.cfg.Dir.Jobs); err == nil {
+				l.Info("Persisted job",
+					zap.String("job", fname),
+				)
+			} else {
+				l.Error("Failed to persist a job",
 					zap.Error(err),
 				)
 				errs = append(errs, err)
 			}
-
-			l.Info("Persisted "+job.TypeSyncWorkflowArtifact+" job",
-				zap.String("artifact", must(ghArtifact.Name)),
-				zap.String("job", fname),
-			)
 		}
 	}
 

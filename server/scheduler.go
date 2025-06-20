@@ -63,6 +63,9 @@ func (s *Server) handleJob(ctx context.Context, j job.Job) {
 	case *job.DiscoverWorkflowArtifacts:
 		err = s.handleDiscoverWorkflowArtifacts(ctx, j)
 
+	case *job.SyncReleaseAsset:
+		err = s.handleSyncRepositoryRelease(ctx, j)
+
 	case *job.SyncWorkflowArtifact:
 		err = s.handleSyncWorkflowArtifact(ctx, j)
 	}

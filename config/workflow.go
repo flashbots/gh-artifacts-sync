@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	errWorkflowInvalidRegexp = errors.New("invalid regexp")
+	errWorkflowInvalidArtifactRegexp = errors.New("invalid artifact regexp")
 )
 
 type Workflow struct {
@@ -24,7 +24,7 @@ func (cfg *Workflow) Validate() error {
 			a.regexp = re
 		} else {
 			errs = append(errs, fmt.Errorf("%w: %s: %w",
-				errWorkflowInvalidRegexp, regex, err,
+				errWorkflowInvalidArtifactRegexp, regex, err,
 			))
 		}
 	}

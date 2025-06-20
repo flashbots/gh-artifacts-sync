@@ -9,7 +9,7 @@ import (
 )
 
 type Dir struct {
-	Artifacts string `yaml:"artifacts" json:"artifacts"`
+	Downloads string `yaml:"downloads" json:"downloads"`
 	Jobs      string `yaml:"jobs"      json:"jobs"`
 }
 
@@ -21,9 +21,9 @@ func (cfg *Dir) Validate() error {
 	errs := make([]error, 0)
 
 	{ // artifacts
-		if info, err := os.Stat(cfg.Artifacts); err != nil {
+		if info, err := os.Stat(cfg.Downloads); err != nil {
 			if !os.IsNotExist(err) {
-				if errMkdir := os.Mkdir(cfg.Artifacts, 0640); errMkdir != nil {
+				if errMkdir := os.Mkdir(cfg.Downloads, 0640); errMkdir != nil {
 					errs = append(errs, err, errMkdir)
 				}
 			} else {
@@ -32,7 +32,7 @@ func (cfg *Dir) Validate() error {
 		} else {
 			if !info.IsDir() {
 				errs = append(errs, fmt.Errorf("%w: %s",
-					errDirNotDirectory, cfg.Artifacts,
+					errDirNotDirectory, cfg.Downloads,
 				))
 			}
 		}

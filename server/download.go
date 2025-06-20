@@ -16,35 +16,29 @@ import (
 	"go.uber.org/zap"
 )
 
-func (s *Server) download(
+func (s *Server) downloadWorkflowArtifact(
 	ctx context.Context,
 	j *job.SyncWorkflowArtifact,
 ) (string, error) {
 	l := logutils.LoggerFromContext(ctx)
 
-	var (
-		url, zname string
-		stream     io.ReadCloser
-	)
+	var downloadsDir string
+	{ // create artifact downloads dir
+		downloadsDir = filepath.Join(
+			s.cfg.Dir.Downloads, j.RepoOwner(), j.Repo(), "workflows", strconv.Itoa(int(j.WorkflowRunID())),
+		)
 
-	path := filepath.Join(
-		s.cfg.Dir.Artifacts,
-		j.RepoOwner(),
-		j.Repo(),
-		strconv.Itoa(int(j.WorkflowRunID())),
-	)
-
-	{ // artifact download dir
-		if err := os.MkdirAll(path, 0750); err != nil {
+		if err := os.MkdirAll(downloadsDir, 0750); err != nil {
 			l.Error("Failed to create artifact download directory",
 				zap.Error(err),
-				zap.String("path", path),
+				zap.String("path", downloadsDir),
 			)
 			return "", err
 		}
 	}
 
-	{ // download link
+	var downloadLink string
+	{ // get the download link
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
@@ -57,76 +51,116 @@ func (s *Server) download(
 			)
 			return "", err
 		}
-		url = _url.String()
+		downloadLink = _url.String()
 	}
 
-	{ // get artifact body stream
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	var fname string
+	{ // download
+		fname = filepath.Join(downloadsDir, j.ArtifactName())
+		if err := s.downloadFromGithub(ctx, downloadLink, fname, time.Minute); err != nil {
+			l.Error("Failed to download an artifact", zap.Error(err))
+			return "", err
+		}
+	}
+
+	return fname, nil
+}
+
+func (s *Server) downloadReleaseAsset(
+	ctx context.Context,
+	j *job.SyncReleaseAsset,
+) (string, error) {
+	l := logutils.LoggerFromContext(ctx)
+
+	var downloadsDir string
+	{ // create asset downloads dir
+		downloadsDir = filepath.Join(
+			s.cfg.Dir.Downloads, j.RepoOwner(), j.Repo(), "assets", strconv.Itoa(int(j.AssetID())),
+		)
+		if err := os.MkdirAll(downloadsDir, 0750); err != nil {
+			l.Error("Failed to create asset download directory",
+				zap.Error(err),
+				zap.String("path", downloadsDir),
+			)
+			return "", err
+		}
+	}
+
+	var fname string
+	{ // download
+		fname = filepath.Join(downloadsDir, j.AssetName())
+		if err := s.downloadFromGithub(ctx, *j.Asset.URL, fname, time.Minute); err != nil {
+			l.Error("Failed to download an asset", zap.Error(err))
+			return "", err
+		}
+	}
+
+	return fname, nil
+}
+
+func (s *Server) downloadFromGithub(
+	ctx context.Context,
+	url, fname string,
+	timeout time.Duration,
+) error {
+	l := logutils.LoggerFromContext(ctx).With(
+		zap.String("url", url),
+		zap.String("file_name", fname),
+	)
+
+	var stream io.ReadCloser
+
+	{ // get http stream
+		ctx, cancel := context.WithTimeout(ctx, timeout)
 		defer cancel()
 
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 		if err != nil {
-			l.Error("Failed to create http request",
-				zap.Error(err),
-			)
-			return "", err
+			return fmt.Errorf("failed to create http request: %w", err)
 		}
-		res, err := http.DefaultClient.Do(req)
+		res, err := s.github.Client().Do(req)
 		if err != nil {
-			l.Error("Failed to execute http request",
-				zap.Error(err),
-				zap.String("url", url),
-			)
-			return "", err
+			return fmt.Errorf("failed to execute http request: %w", err)
 		}
 		defer res.Body.Close()
 
 		if res.StatusCode != http.StatusOK {
-			err = fmt.Errorf("download failed with status: %d", res.StatusCode)
-			l.Error("Failed to download workflow artifact",
-				zap.Error(err),
+			return fmt.Errorf("download failed b/c of an unexpected status: %d",
+				res.StatusCode,
 			)
-			return "", err
 		}
 
 		stream = res.Body
 	}
 
-	{ // download zip archive
-		zname = filepath.Join(path, j.ArtifactName()+".zip") // gh sends zips only
-		zfile, err := os.OpenFile(zname, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0640)
+	{ // download
+		file, err := os.OpenFile(fname, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0640)
 		if err != nil {
-			l.Error("Failed to create workflow artifact zip file",
-				zap.Error(err),
-				zap.String("zip_file_name", zname),
-			)
-			return "", errors.Join(err, zfile.Close())
+			if file != nil {
+				err = errors.Join(err,
+					file.Close(),
+				)
+			}
+			return fmt.Errorf("failed to create download file: %w", err)
 		}
 
-		l.Debug("Downloading workflow artifact zip file...")
+		l.Debug("Downloading a file...")
 		start := time.Now()
 
-		if _, err = io.Copy(zfile, stream); err != nil {
-			l.Error("Failed to write workflow artifact zip file",
-				zap.Error(err),
-				zap.String("zip_file_name", zname),
-			)
-			return "", errors.Join(err, zfile.Close())
+		if _, err = io.Copy(file, stream); err != nil {
+			return fmt.Errorf("failed to download a file: %w", errors.Join(err,
+				file.Close(),
+			))
 		}
 
-		if err := zfile.Close(); err != nil {
-			l.Error("Failed to close workflow artifacts zip file",
-				zap.Error(err),
-				zap.String("zip_file_name", zname),
-			)
-			return "", err
+		if err := file.Close(); err != nil {
+			return fmt.Errorf("failed to close the downloaded file: %w", err)
 		}
 
-		l.Info("Downloaded workflow artifact zip file",
-			zap.String("zip_file_name", zname),
+		l.Info("Downloaded a file",
 			zap.Duration("duration", time.Since(start)),
 		)
 	}
 
-	return zname, nil
+	return nil
 }

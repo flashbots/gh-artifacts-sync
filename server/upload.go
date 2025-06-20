@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/flashbots/gh-artifacts-sync/config"
@@ -20,14 +22,40 @@ import (
 	"google.golang.org/api/option"
 )
 
+func (s *Server) uploadAndDelete(
+	ctx context.Context,
+	j job.Uploadable,
+	zname string,
+) error {
+	l := logutils.LoggerFromContext(ctx)
+
+	defer func() {
+		if err := os.Remove(zname); err != nil {
+			l.Error("Failed to remove zip file",
+				zap.Error(err),
+				zap.String("file_name", zname),
+			)
+		}
+		dir := filepath.Dir(zname)
+		if err := os.Remove(dir); err != nil {
+			l.Error("Failed to remove downloads dir",
+				zap.Error(err),
+				zap.String("path", dir),
+			)
+		}
+	}()
+
+	return s.upload(ctx, j, zname)
+}
+
 func (s *Server) upload(
 	ctx context.Context,
-	j *job.SyncWorkflowArtifact,
+	j job.Uploadable,
 	zname string,
 ) error {
 	errs := make([]error, 0)
 
-	for _, dst := range j.Destinations {
+	for _, dst := range j.GetDestinations() {
 		switch dst.Type {
 		case types.DestinationGcpArtifactRegistryGeneric:
 			errs = append(errs,
@@ -47,7 +75,7 @@ func (s *Server) upload(
 
 func (s *Server) uploadToGcpArtifactRegistryGeneric(
 	ctx context.Context,
-	j *job.SyncWorkflowArtifact,
+	j job.Uploadable,
 	zname string,
 	dst *config.Destination,
 ) error {
@@ -99,13 +127,13 @@ iteratingFiles:
 
 		l = l.With(
 			zap.String("package", dst.Package),
-			zap.String("version", j.Version),
+			zap.String("version", j.GetVersion()),
 			zap.String("file_name", f.Name),
 		)
 
 		{ // check if the file already exists
 			filter := fmt.Sprintf(`name="%s/files/%s:%s:%s"`,
-				dst.Path, dst.Package, j.Version, f.Name,
+				dst.Path, dst.Package, j.GetVersion(), f.Name,
 			)
 			res, err := files.List(dst.Path).Filter(filter).Do()
 			if err == nil && res.HTTPStatusCode != http.StatusOK {
@@ -189,7 +217,7 @@ iteratingFiles:
 			req := artifacts.Upload(dst.Path, &artifactregistry.UploadGenericArtifactRequest{
 				Filename:  f.Name,
 				PackageId: dst.Package,
-				VersionId: j.Version,
+				VersionId: j.GetVersion(),
 			})
 			req.Media(stream, googleapi.ContentType("application/octet-stream"))
 

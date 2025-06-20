@@ -76,17 +76,12 @@ func (j *SyncWorkflowArtifact) ArtifactID() int64 {
 	return *j.Artifact.ID
 }
 
-func (j *SyncWorkflowArtifact) RepoOwner() string {
-	if j == nil ||
-		j.Artifact == nil ||
-		j.Artifact.URL == nil {
-		return ""
-	}
-	parts := strings.Split(strings.TrimPrefix(*j.Artifact.URL, "https://api.github.com/repos/"), "/")
-	if len(parts) != 5 {
-		return ""
-	}
-	return parts[0]
+func (j *SyncWorkflowArtifact) GetDestinations() []*config.Destination {
+	return j.Destinations
+}
+
+func (j *SyncWorkflowArtifact) GetVersion() string {
+	return j.Version
 }
 
 func (j *SyncWorkflowArtifact) Repo() string {
@@ -95,11 +90,30 @@ func (j *SyncWorkflowArtifact) Repo() string {
 		j.Artifact.URL == nil {
 		return ""
 	}
-	parts := strings.Split(strings.TrimPrefix(*j.Artifact.URL, "https://api.github.com/repos/"), "/")
+	parts := strings.Split(
+		strings.TrimPrefix(*j.Artifact.URL, "https://api.github.com/repos/"),
+		"/",
+	)
 	if len(parts) != 5 {
 		return ""
 	}
 	return parts[1]
+}
+
+func (j *SyncWorkflowArtifact) RepoOwner() string {
+	if j == nil ||
+		j.Artifact == nil ||
+		j.Artifact.URL == nil {
+		return ""
+	}
+	parts := strings.Split(
+		strings.TrimPrefix(*j.Artifact.URL, "https://api.github.com/repos/"),
+		"/",
+	)
+	if len(parts) != 5 {
+		return ""
+	}
+	return parts[0]
 }
 
 func (j *SyncWorkflowArtifact) URL() string {

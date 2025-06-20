@@ -35,14 +35,14 @@ func CommandServe(cfg *config.Config) *cli.Command {
 	var githubAppPrivateKeyPath, githubWebhookSecretPath string
 
 	dirFlags := []cli.Flag{ // --dir-xxx
-		&cli.StringFlag{ // --dir-artifacts
-			Aliases:     []string{"dir.artifacts"},
+		&cli.StringFlag{ // --dir-downloads
+			Aliases:     []string{"dir.downloads"},
 			Category:    strings.ToUpper(categoryDir),
-			Destination: &cfg.Dir.Artifacts,
-			EnvVars:     []string{envPrefix + strings.ToUpper(categoryDir) + "_ARTIFACTS"},
-			Name:        categoryDir + "-artifacts",
+			Destination: &cfg.Dir.Downloads,
+			EnvVars:     []string{envPrefix + strings.ToUpper(categoryDir) + "_DOWNLOADS"},
+			Name:        categoryDir + "-downloads",
 			Usage:       "a `path` to the directory where downloaded artifacts will be temporarily stored",
-			Value:       "./artifacts",
+			Value:       "./downloads",
 		},
 
 		&cli.StringFlag{ // --dir-jobs

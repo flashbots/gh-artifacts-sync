@@ -8,7 +8,10 @@ import (
 	"go.uber.org/zap"
 )
 
-func (s *Server) handleCleanupUnparseableJob(ctx context.Context, j *job.CleanupUnparseableJob) error {
+func (s *Server) handleCleanupUnparseableJob(
+	ctx context.Context,
+	j *job.CleanupUnparseableJob,
+) error {
 	l := logutils.LoggerFromContext(ctx)
 
 	l.Info("Cleaning up unparseable job",
