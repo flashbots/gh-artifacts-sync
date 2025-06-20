@@ -118,6 +118,7 @@ func (s *Server) downloadFromGithub(
 		if err != nil {
 			return fmt.Errorf("failed to create http request: %w", err)
 		}
+		req.Header.Add("accept", "application/octet-stream")
 		res, err := s.github.Client().Do(req)
 		if err != nil {
 			return fmt.Errorf("failed to execute http request: %w", err)

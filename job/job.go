@@ -47,12 +47,21 @@ func Load(path string) (Job, error) {
 			return nil, err
 		}
 		job = j
+
+	case TypeSyncReleaseAsset:
+		j := &SyncReleaseAsset{}
+		if err := json.Unmarshal(bytes, j); err != nil {
+			return nil, err
+		}
+		job = j
+
 	case TypeSyncWorkflowArtifact:
 		j := &SyncWorkflowArtifact{}
 		if err := json.Unmarshal(bytes, j); err != nil {
 			return nil, err
 		}
 		job = j
+
 	default:
 		return nil, fmt.Errorf("%w: %s",
 			errUnknownType, header.Meta.Type,

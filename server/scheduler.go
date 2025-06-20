@@ -15,8 +15,10 @@ import (
 func (s *Server) scheduleJobs(_ time.Time) {
 	l := s.logger
 
-	if s.jobInFlight.Load() > 0 {
-		l.Debug("There are still jobs in-flight, skipping...")
+	if count := s.jobInFlight.Load(); count > 0 {
+		l.Debug("There are still jobs in-flight, skipping...",
+			zap.Int64("count", count),
+		)
 		return
 	}
 
