@@ -60,6 +60,9 @@ func (s *Server) webhook(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		return
 
+	case *github.RegistryPackageEvent:
+		err = s.processRegistryPackageEvent(r.Context(), e)
+
 	case *github.ReleaseEvent:
 		err = s.processReleaseEvent(r.Context(), e)
 
@@ -76,6 +79,70 @@ func (s *Server) webhook(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+}
+
+func (s *Server) processRegistryPackageEvent(ctx context.Context, e *github.RegistryPackageEvent) error {
+	l := logutils.LoggerFromContext(ctx)
+
+	if err := s.sanitiseRegistryPackageEvent(e); err != nil {
+		l.Warn("Ignoring invalid registry package event",
+			zap.Error(err),
+		)
+		return err
+	}
+
+	l = l.With(
+		zap.String("repo", *e.Repository.FullName),
+		zap.String("package", *e.RegistryPackage.Name),
+		zap.String("version", *e.RegistryPackage.PackageVersion.Version),
+		zap.Int64("version_id", *e.RegistryPackage.PackageVersion.ID),
+	)
+
+	if *e.Action != "published" {
+		l.Debug("Ignoring registry package event b/c its status is not 'published'",
+			zap.String("action", *e.Action),
+		)
+		return nil
+	}
+
+	if *e.RegistryPackage.Ecosystem != "CONTAINER" {
+		l.Debug("Ignoring registry package event b/c its ecosystem is not supported",
+			zap.String("ecosystem", *e.RegistryPackage.Ecosystem),
+		)
+		return nil
+	}
+
+	repo, repoIsConfigured := s.cfg.Repositories[must(e.Repository.FullName)]
+	if !repoIsConfigured {
+		l.Debug("Ignoring registry package event b/c we don't have configuration for this repo")
+		return nil
+	}
+
+	container, containerIsConfigured := repo.Containers[*e.RegistryPackage.Name]
+	if !containerIsConfigured {
+		l.Debug("Ignoring registry package event b/c we don't have configuration for this container")
+		return nil
+	}
+
+	j := job.NewSyncContainerRegistryPackage(
+		e.RegistryPackage,
+		e.Repository,
+		container.Destinations,
+	)
+
+	fname, err := job.Save(j, s.cfg.Dir.Jobs)
+	if err != nil {
+		l.Error("Failed to persist a job",
+			zap.Error(err),
+		)
+		return err
+	}
+
+	l.Info("Persisted a job",
+		zap.String("job", fname),
+	)
+
+	return nil
 }
 
 func (s *Server) processReleaseEvent(ctx context.Context, e *github.ReleaseEvent) error {

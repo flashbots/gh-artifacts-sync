@@ -8,14 +8,15 @@ import (
 	"github.com/flashbots/gh-artifacts-sync/utils"
 )
 
+type Repository struct {
+	Containers map[string]*Container `yaml:"containers" json:"containers"`
+	Releases   map[string]*Release   `yaml:"releases"   json:"releases"`
+	Workflows  map[string]*Workflow  `yaml:"workflows"  json:"workflows"`
+}
+
 var (
 	errRepositoryInvalidReleaseRegexp = errors.New("invalid release regexp")
 )
-
-type Repository struct {
-	Releases  map[string]*Release  `yaml:"releases"  json:"releases"`
-	Workflows map[string]*Workflow `yaml:"workflows" json:"workflows"`
-}
 
 func (cfg *Repository) Validate() error {
 	errs := make([]error, 0)

@@ -52,7 +52,7 @@ func (j *SyncReleaseAsset) meta() *Meta {
 	return j.Meta
 }
 
-func (j *SyncReleaseAsset) AssetID() int64 {
+func (j *SyncReleaseAsset) GetAssetID() int64 {
 	if j == nil ||
 		j.Asset == nil ||
 		j.Asset.ID == nil {
@@ -62,7 +62,7 @@ func (j *SyncReleaseAsset) AssetID() int64 {
 	return *j.Asset.ID
 }
 
-func (j *SyncReleaseAsset) AssetName() string {
+func (j *SyncReleaseAsset) GetAssetName() string {
 	if j == nil ||
 		j.Asset == nil ||
 		j.Asset.Name == nil {
@@ -76,11 +76,7 @@ func (j *SyncReleaseAsset) GetDestinations() []*config.Destination {
 	return j.Destinations
 }
 
-func (j *SyncReleaseAsset) GetVersion() string {
-	return j.Version
-}
-
-func (j *SyncReleaseAsset) Repo() string {
+func (j *SyncReleaseAsset) GetRepo() string {
 	if j == nil ||
 		j.Asset == nil ||
 		j.Asset.URL == nil {
@@ -97,7 +93,7 @@ func (j *SyncReleaseAsset) Repo() string {
 	return parts[1]
 }
 
-func (j *SyncReleaseAsset) RepoOwner() string {
+func (j *SyncReleaseAsset) GetRepoOwner() string {
 	if j == nil ||
 		j.Asset == nil ||
 		j.Asset.URL == nil {
@@ -112,4 +108,8 @@ func (j *SyncReleaseAsset) RepoOwner() string {
 		return ""
 	}
 	return parts[0]
+}
+
+func (j *SyncReleaseAsset) GetVersion() string {
+	return j.Version
 }

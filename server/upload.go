@@ -3,26 +3,36 @@ package server
 import (
 	"archive/zip"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/flashbots/gh-artifacts-sync/config"
 	"github.com/flashbots/gh-artifacts-sync/job"
 	"github.com/flashbots/gh-artifacts-sync/logutils"
-	"github.com/flashbots/gh-artifacts-sync/types"
 	"github.com/flashbots/gh-artifacts-sync/utils"
-	"golang.org/x/oauth2/google"
 
 	"go.uber.org/zap"
+
 	"google.golang.org/api/artifactregistry/v1"
 	"google.golang.org/api/googleapi"
-	"google.golang.org/api/option"
+
+	crauthn "github.com/google/go-containerregistry/pkg/authn"
+	crname "github.com/google/go-containerregistry/pkg/name"
+	cr "github.com/google/go-containerregistry/pkg/v1"
+	crempty "github.com/google/go-containerregistry/pkg/v1/empty"
+	crmutate "github.com/google/go-containerregistry/pkg/v1/mutate"
+	crremote "github.com/google/go-containerregistry/pkg/v1/remote"
+	crtransport "github.com/google/go-containerregistry/pkg/v1/remote/transport"
+	crtarball "github.com/google/go-containerregistry/pkg/v1/tarball"
 )
 
-func (s *Server) uploadAndDelete(
+func (s *Server) uploadFromZipAndDelete(
 	ctx context.Context,
 	j job.Uploadable,
 	zname string,
@@ -31,90 +41,79 @@ func (s *Server) uploadAndDelete(
 
 	defer func() {
 		if err := os.Remove(zname); err != nil {
-			l.Error("Failed to remove zip file",
-				zap.Error(err),
-				zap.String("file_name", zname),
-			)
+			l.Error("Failed to remove zip file", zap.Error(err))
 		}
 		dir := filepath.Dir(zname)
 		if err := os.Remove(dir); err != nil {
-			l.Error("Failed to remove downloads dir",
-				zap.Error(err),
-				zap.String("path", dir),
-			)
+			l.Error("Failed to remove downloads dir", zap.Error(err))
 		}
 	}()
 
-	return s.upload(ctx, j, zname)
+	return s.uploadFromZip(ctx, j, zname)
 }
 
-func (s *Server) upload(
+func (s *Server) uploadFromZip(
 	ctx context.Context,
 	j job.Uploadable,
 	zname string,
 ) error {
 	errs := make([]error, 0)
 
+	l := logutils.LoggerFromContext(ctx)
+
 	for _, dst := range j.GetDestinations() {
+		_ctx := logutils.ContextWithLogger(ctx, l.With(
+			zap.String("destination_type", dst.Type),
+			zap.String("destination_path", dst.Path),
+			zap.String("source_path", zname),
+		))
+
 		switch dst.Type {
-		case types.DestinationGcpArtifactRegistryGeneric:
-			errs = append(errs,
-				s.uploadToGcpArtifactRegistryGeneric(ctx, j, zname, dst),
-			)
+		case config.DestinationGcpArtifactRegistryGeneric:
+			if jf := j.(job.UploadableFile); jf != nil {
+				errs = append(errs,
+					s.uploadFromZipToGcpArtifactRegistryGeneric(_ctx, jf, zname, dst),
+				)
+			}
+
+		case config.DestinationGcpArtifactRegistryDocker:
+			if jc := j.(job.UploadableContainer); jc != nil {
+				errs = append(errs,
+					s.uploadFromZipToGcpArtifactRegistryDocker(_ctx, jc, zname, dst),
+				)
+			}
 
 		default:
 			errs = append(errs,
 				fmt.Errorf("unexpected destination type: %s", dst.Type),
 			)
 		}
-
 	}
 
 	return utils.FlattenErrors(errs)
 }
 
-func (s *Server) uploadToGcpArtifactRegistryGeneric(
+func (s *Server) uploadFromZipToGcpArtifactRegistryGeneric(
 	ctx context.Context,
-	j job.Uploadable,
+	j job.UploadableFile,
 	zname string,
 	dst *config.Destination,
 ) error {
-	l := logutils.LoggerFromContext(ctx).With(
-		zap.String("dst_type", string(types.DestinationGcpArtifactRegistryGeneric)),
-		zap.String("dst_path", dst.Path),
-	)
+	l := logutils.LoggerFromContext(ctx)
 
-	var (
-		artifacts *artifactregistry.ProjectsLocationsRepositoriesGenericArtifactsService
-		files     *artifactregistry.ProjectsLocationsRepositoriesFilesService
-	)
+	artifacts, err := s.gcp.ArtifactRegistryGeneric()
+	if err != nil {
+		return err
+	}
 
-	{ // artifacts service
-		creds, err := google.FindDefaultCredentials(ctx, artifactregistry.CloudPlatformScope)
-		if err != nil {
-			l.Error("Failed to find gcp credentials",
-				zap.Error(err),
-			)
-			return err
-		}
-		_svc, err := artifactregistry.NewService(ctx, option.WithCredentials(creds))
-		if err != nil {
-			l.Error("Failed to initialise gcp artifact registry service",
-				zap.Error(err),
-			)
-			return err
-		}
-		artifacts = _svc.Projects.Locations.Repositories.GenericArtifacts
-		files = _svc.Projects.Locations.Repositories.Files
+	files, err := s.gcp.ArtifactRegistryFiles()
+	if err != nil {
+		return err
 	}
 
 	z, err := zip.OpenReader(zname)
 	if err != nil {
-		l.Error("Failed to open artifact zip file",
-			zap.Error(err),
-			zap.String("zip_file_name", zname),
-		)
-		return err
+		return fmt.Errorf("failed to open zip file: %w", err)
 	}
 	defer z.Close()
 
@@ -126,9 +125,7 @@ iteratingFiles:
 		}
 
 		l = l.With(
-			zap.String("package", dst.Package),
-			zap.String("version", j.GetVersion()),
-			zap.String("file_name", f.Name),
+			zap.String("file", f.Name),
 		)
 
 		{ // check if the file already exists
@@ -250,4 +247,134 @@ iteratingFiles:
 	}
 
 	return utils.FlattenErrors(errs)
+}
+
+func (s *Server) uploadFromZipToGcpArtifactRegistryDocker(
+	ctx context.Context,
+	j job.UploadableContainer,
+	zname string,
+	dst *config.Destination,
+) error {
+	l := logutils.LoggerFromContext(ctx)
+
+	z, err := zip.OpenReader(zname)
+	if err != nil {
+		return fmt.Errorf("failed to open zip file: %w", err)
+	}
+	defer z.Close()
+
+	errs := make([]error, 0)
+
+	var images = make([]cr.Image, 0)
+	{ // get images
+		for _, f := range z.File {
+			if f.FileInfo().IsDir() {
+				continue
+			}
+
+			platform := filepath.Dir(f.FileInfo().Name())
+
+			if len(dst.Platforms) > 0 && !slices.Contains(dst.Platforms, platform) {
+				continue
+			}
+
+			image, err := crtarball.Image(zipFileOpener(f), nil)
+			if err != nil {
+				l.Error("Failed to open container tarball",
+					zap.Error(err),
+					zap.String("file", f.Name),
+				)
+				errs = append(errs, err)
+				continue
+			}
+
+			images = append(images, image)
+		}
+	}
+
+	if len(images) == 0 {
+		return utils.FlattenErrors(errs)
+	}
+
+	var ref crname.Reference
+	{ // get remote reference
+		reference := j.GetDestinationReference(dst)
+		_ref, err := crname.ParseReference(reference)
+		if err != nil {
+			l.Error("Failed to parse destination reference",
+				zap.Error(err),
+				zap.String("reference", reference),
+			)
+			errs = append(errs, err)
+			return utils.FlattenErrors(errs)
+		}
+		ref = _ref
+	}
+
+	var auth crauthn.Authenticator
+	{ // get authentication token
+		token, err := s.gcp.AccessToken(
+			"https://www.googleapis.com/auth/cloud-platform",
+			30*time.Second,
+		)
+		if err != nil {
+			l.Error("Failed to get gcp token", zap.Error(err))
+			errs = append(errs, err)
+			return utils.FlattenErrors(errs)
+		}
+		auth = crauthn.FromConfig(crauthn.AuthConfig{
+			Username: "oauth2accesstoken",
+			Password: token,
+		})
+	}
+
+	var uploadErr error
+	{ // upload
+		switch len(images) {
+		case 1: // single image
+			for _, image := range images {
+				// 1-iteration loop b/c there's only one
+				uploadErr = crremote.Write(ref, image, crremote.WithAuth(auth))
+				if uploadErr != nil {
+					l.Error("Failed to push the image to the destination",
+						zap.Error(err),
+						zap.String("reference", ref.String()),
+					)
+				}
+			}
+
+		default: // multi-platform image
+			var index cr.ImageIndex = crempty.Index
+			for _, image := range images {
+				index = crmutate.AppendManifests(index, crmutate.IndexAddendum{
+					Add: image,
+				})
+			}
+
+			uploadErr = crremote.WriteIndex(ref, index, crremote.WithAuth(auth))
+			if uploadErr != nil {
+				l.Error("Failed to push the image index to the destination",
+					zap.Error(err),
+					zap.String("reference", ref.String()),
+				)
+			}
+		}
+	}
+
+	if uploadErr != nil {
+		transportErr := &crtransport.Error{}
+		if errors.As(err, &transportErr) && transportErr.Temporary() {
+			errs = append(errs, uploadErr)
+		} else {
+			errs = append(errs, utils.NoRetry(err))
+		}
+	}
+
+	return utils.FlattenErrors(errs)
+}
+
+func zipFileOpener(zf *zip.File) crtarball.Opener {
+	return func() (io.ReadCloser, error) {
+		return zf.Open()
+	}
 }

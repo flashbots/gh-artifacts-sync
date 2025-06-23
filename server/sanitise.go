@@ -6,13 +6,89 @@ import (
 	"github.com/google/go-github/v72/github"
 )
 
+func (s *Server) sanitiseRegistryPackageEvent(e *github.RegistryPackageEvent) error {
+	if e == nil {
+		return errors.New("nil registry package event")
+	}
+
+	if e.Action == nil {
+		return errors.New("missing action")
+	}
+
+	if e.RegistryPackage == nil {
+		return errors.New("missing registry package info")
+	}
+
+	if e.RegistryPackage.Ecosystem == nil {
+		return errors.New("missing registry package ecosystem")
+	}
+
+	if e.RegistryPackage.Name == nil {
+		return errors.New("missing registry package name")
+	}
+
+	if e.RegistryPackage.PackageType == nil {
+		return errors.New("missing registry package type")
+	}
+
+	if e.RegistryPackage.PackageVersion == nil {
+		return errors.New("missing registry package version info")
+	}
+
+	if e.RegistryPackage.PackageVersion.ContainerMetadata == nil {
+		return errors.New("missing registry package container metadata info")
+	}
+
+	if e.RegistryPackage.PackageVersion.ContainerMetadata.Tag == nil {
+		return errors.New("missing registry package container tag info")
+	}
+
+	if e.RegistryPackage.PackageVersion.ContainerMetadata.Tag.Digest == nil {
+		return errors.New("missing registry package container digest")
+	}
+
+	if e.RegistryPackage.PackageVersion.ContainerMetadata.Tag.Name == nil {
+		return errors.New("missing registry package container tag name")
+	}
+
+	if e.RegistryPackage.PackageVersion.ID == nil {
+		return errors.New("missing registry package version id")
+	}
+
+	if e.RegistryPackage.PackageVersion.PackageURL == nil {
+		return errors.New("missing registry package version url")
+	}
+
+	if e.RegistryPackage.PackageVersion.Version == nil {
+		return errors.New("missing registry package version")
+	}
+
+	if e.Repository == nil {
+		return errors.New("missing repo info")
+	}
+
+	if e.Repository.FullName == nil {
+		return errors.New("missing repo full name")
+	}
+
+	if e.Repository.Name == nil {
+		return errors.New("missing repo name")
+	}
+
+	if e.Repository.Owner == nil {
+		return errors.New("missing repo owner")
+	}
+
+	return nil
+}
+
 func (s *Server) sanitiseReleaseEvent(e *github.ReleaseEvent) error {
 	if e == nil {
 		return errors.New("nil release event")
 	}
 
 	if e.Action == nil {
-		return errors.New("missing repo action")
+		return errors.New("missing action")
 	}
 
 	if e.Repo == nil {

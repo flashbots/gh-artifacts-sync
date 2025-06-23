@@ -17,15 +17,14 @@ func (s *Server) handleDiscoverWorkflowArtifacts(
 	j *job.DiscoverWorkflowArtifacts,
 ) error {
 	l := logutils.LoggerFromContext(ctx).With(
-		zap.String("owner", j.Owner()),
-		zap.String("repo", j.Repo()),
+		zap.String("repo", j.RepoFullName()),
 		zap.String("workflow", j.WorkflowFile()),
 		zap.Int64("workflow_run_id", j.WorkflowRunID()),
 	)
 
 	l.Info("Discovering artifacts of the workflow...")
 
-	repo, repoIsConfigured := s.cfg.Repositories[j.FullName()]
+	repo, repoIsConfigured := s.cfg.Repositories[j.RepoFullName()]
 	if !repoIsConfigured {
 		l.Info("Ignoring workflow b/c we don't have configuration for this repo")
 		return nil
@@ -43,8 +42,8 @@ func (s *Server) handleDiscoverWorkflowArtifacts(
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 
-		list, res, err := s.github.Actions.ListWorkflowRunArtifacts(
-			ctx, j.Owner(), j.Repo(), j.WorkflowRunID(), &github.ListOptions{Page: page},
+		list, res, err := s.Github().Actions.ListWorkflowRunArtifacts(
+			ctx, j.RepoOwner(), j.Repo(), j.WorkflowRunID(), &github.ListOptions{Page: page},
 		)
 		if err != nil {
 			l.Error("Failed to list workflow artifacts",

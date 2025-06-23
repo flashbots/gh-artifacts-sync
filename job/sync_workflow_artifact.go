@@ -57,7 +57,7 @@ func (j *SyncWorkflowArtifact) meta() *Meta {
 	return j.Meta
 }
 
-func (j *SyncWorkflowArtifact) ArtifactName() string {
+func (j *SyncWorkflowArtifact) GetArtifactName() string {
 	if j == nil ||
 		j.Artifact == nil ||
 		j.Artifact.Name == nil {
@@ -67,7 +67,7 @@ func (j *SyncWorkflowArtifact) ArtifactName() string {
 	return *j.Artifact.Name
 }
 
-func (j *SyncWorkflowArtifact) ArtifactID() int64 {
+func (j *SyncWorkflowArtifact) GetArtifactID() int64 {
 	if j == nil ||
 		j.Artifact == nil ||
 		j.Artifact.ID == nil {
@@ -80,11 +80,23 @@ func (j *SyncWorkflowArtifact) GetDestinations() []*config.Destination {
 	return j.Destinations
 }
 
-func (j *SyncWorkflowArtifact) GetVersion() string {
-	return j.Version
+func (j *SyncWorkflowArtifact) GetRepoFullName() string {
+	if j == nil ||
+		j.Artifact == nil ||
+		j.Artifact.URL == nil {
+		return ""
+	}
+	parts := strings.Split(
+		strings.TrimPrefix(*j.Artifact.URL, "https://api.github.com/repos/"),
+		"/",
+	)
+	if len(parts) != 5 {
+		return ""
+	}
+	return parts[0] + "/" + parts[1]
 }
 
-func (j *SyncWorkflowArtifact) Repo() string {
+func (j *SyncWorkflowArtifact) GetRepo() string {
 	if j == nil ||
 		j.Artifact == nil ||
 		j.Artifact.URL == nil {
@@ -100,7 +112,7 @@ func (j *SyncWorkflowArtifact) Repo() string {
 	return parts[1]
 }
 
-func (j *SyncWorkflowArtifact) RepoOwner() string {
+func (j *SyncWorkflowArtifact) GetRepoOwner() string {
 	if j == nil ||
 		j.Artifact == nil ||
 		j.Artifact.URL == nil {
@@ -116,7 +128,7 @@ func (j *SyncWorkflowArtifact) RepoOwner() string {
 	return parts[0]
 }
 
-func (j *SyncWorkflowArtifact) URL() string {
+func (j *SyncWorkflowArtifact) GetURL() string {
 	if j == nil ||
 		j.Artifact == nil ||
 		j.Artifact.URL == nil {
@@ -126,7 +138,11 @@ func (j *SyncWorkflowArtifact) URL() string {
 	return *j.Artifact.URL
 }
 
-func (j *SyncWorkflowArtifact) WorkflowRunID() int64 {
+func (j *SyncWorkflowArtifact) GetVersion() string {
+	return j.Version
+}
+
+func (j *SyncWorkflowArtifact) GetWorkflowRunID() int64 {
 	if j == nil ||
 		j.Artifact == nil ||
 		j.Artifact.WorkflowRun == nil ||

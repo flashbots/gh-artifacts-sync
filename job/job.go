@@ -48,6 +48,13 @@ func Load(path string) (Job, error) {
 		}
 		job = j
 
+	case TypeSyncContainerRegistryPackage:
+		j := &SyncContainerRegistryPackage{}
+		if err := json.Unmarshal(bytes, j); err != nil {
+			return nil, err
+		}
+		job = j
+
 	case TypeSyncReleaseAsset:
 		j := &SyncReleaseAsset{}
 		if err := json.Unmarshal(bytes, j); err != nil {

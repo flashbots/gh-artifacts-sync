@@ -15,25 +15,24 @@ func (s *Server) handleSyncRepositoryRelease(
 	j *job.SyncReleaseAsset,
 ) error {
 	l := logutils.LoggerFromContext(ctx).With(
-		zap.String("repo_owner", j.RepoOwner()),
-		zap.String("repo", j.Repo()),
-		zap.Int64("asset_id", j.AssetID()),
-		zap.String("asset_name", j.AssetName()),
+		zap.String("repo_owner", j.GetRepoOwner()),
+		zap.String("repo", j.GetRepo()),
+		zap.Int64("asset_id", j.GetAssetID()),
+		zap.String("asset_name", j.GetAssetName()),
 		zap.String("version", j.Version),
 	)
 	ctx = logutils.ContextWithLogger(ctx, l)
 
 	l.Info("Synchronising release asset...")
 
-	zname, err := s.downloadReleaseAsset(ctx, j)
+	zname, err := s.downloadGithubReleaseAsset(ctx, j)
 	if err != nil {
+		l.Error("Failed to download release asset", zap.Error(err))
 		return errors.Join(err, os.Remove(zname))
 	}
 
-	if err := s.uploadAndDelete(ctx, j, zname); err != nil {
-		l.Error("Failed to synchronise release asset",
-			zap.Error(err),
-		)
+	if err := s.uploadFromZipAndDelete(ctx, j, zname); err != nil {
+		l.Error("Failed to upload release asset", zap.Error(err))
 		return err
 	}
 

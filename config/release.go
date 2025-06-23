@@ -8,10 +8,6 @@ import (
 	"github.com/flashbots/gh-artifacts-sync/utils"
 )
 
-var (
-	errReleaseInvalidAssetRegexp = errors.New("invalid asset regexp")
-)
-
 type Release struct {
 	regexp *regexp.Regexp `yaml:"-" json:"-"`
 
@@ -19,6 +15,10 @@ type Release struct {
 	AcceptPrereleases bool              `yaml:"accept_prereleases" json:"accept_prereleases"`
 	Assets            map[string]*Asset `yaml:"assets"             json:"assets"`
 }
+
+var (
+	errReleaseInvalidAssetRegexp = errors.New("invalid asset regexp")
+)
 
 func (cfg *Release) Validate() error {
 	errs := make([]error, 0)

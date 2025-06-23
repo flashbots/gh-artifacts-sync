@@ -8,13 +8,13 @@ import (
 	"github.com/flashbots/gh-artifacts-sync/utils"
 )
 
-var (
-	errWorkflowInvalidArtifactRegexp = errors.New("invalid artifact regexp")
-)
-
 type Workflow struct {
 	Artifacts map[string]*Artifact `yaml:"artifacts" json:"artifacts"`
 }
+
+var (
+	errWorkflowInvalidArtifactRegexp = errors.New("invalid artifact regexp")
+)
 
 func (cfg *Workflow) Validate() error {
 	errs := make([]error, 0)

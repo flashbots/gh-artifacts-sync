@@ -6,32 +6,63 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/flashbots/gh-artifacts-sync/types"
 	"github.com/flashbots/gh-artifacts-sync/utils"
-)
 
-var (
-	errDestinationInvalidType = errors.New("invalid destination type")
+	cr "github.com/google/go-containerregistry/pkg/v1"
 )
 
 type Destination struct {
-	Type    types.Destination `yaml:"type"    json:"type"`
-	Path    string            `yaml:"path"    json:"path"`
-	Package string            `yaml:"package" json:"package"`
+	Type      string   `yaml:"type"      json:"type"`
+	Path      string   `yaml:"path"      json:"path"`
+	Package   string   `yaml:"package"   json:"package"`
+	Platforms []string `yaml:"platforms" json:"platforms"`
 }
+
+var (
+	errDestinationInvalidType             = errors.New("invalid destination type")
+	errDestinationDoesNotSupportPlatforms = errors.New("destination type does not support platforms option")
+	errDestinationInvalidPlatform         = errors.New("invalid platform")
+)
+
+const (
+	DestinationGcpArtifactRegistryDocker  = "gcp.artifactregistry.docker"
+	DestinationGcpArtifactRegistryGeneric = "gcp.artifactregistry.generic"
+)
 
 func (cfg *Destination) Validate() error {
 	errs := make([]error, 0)
 
-	{ // Type
-		if !slices.Contains(types.Destinations, cfg.Type) {
+	allDestinations := []string{
+		DestinationGcpArtifactRegistryDocker,
+		DestinationGcpArtifactRegistryGeneric,
+	}
+
+	destinationsWithPlatform := []string{
+		DestinationGcpArtifactRegistryDocker,
+	}
+
+	{ // type
+		if !slices.Contains(allDestinations, cfg.Type) {
 			errs = append(errs, fmt.Errorf("%w: %s (must be one of: %s)",
-				errDestinationInvalidType,
-				cfg.Type,
-				strings.Join(utils.Map(types.Destinations, func(s types.Destination) string {
-					return string(s)
-				}), ", "),
+				errDestinationInvalidType, cfg.Type, strings.Join(allDestinations, ","),
 			))
+		}
+	}
+
+	{ // platforms
+		if len(cfg.Platforms) > 0 {
+			if !slices.Contains(destinationsWithPlatform, cfg.Type) {
+				errs = append(errs, fmt.Errorf("%w: %s",
+					errDestinationDoesNotSupportPlatforms, cfg.Type,
+				))
+			}
+			for _, platform := range cfg.Platforms {
+				if _, err := cr.ParsePlatform(platform); err != nil {
+					errs = append(errs, fmt.Errorf("%w: %w",
+						errDestinationInvalidPlatform, err,
+					))
+				}
+			}
 		}
 	}
 

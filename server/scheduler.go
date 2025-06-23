@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/flashbots/gh-artifacts-sync/job"
 	"github.com/flashbots/gh-artifacts-sync/logutils"
+	"github.com/flashbots/gh-artifacts-sync/utils"
 	"go.uber.org/zap"
 )
 
@@ -58,25 +60,37 @@ func (s *Server) handleJob(ctx context.Context, j job.Job) {
 	ctx = logutils.ContextWithLogger(ctx, l)
 
 	var err error
-	switch j := j.(type) {
-	case *job.CleanupUnparseableJob:
-		err = s.handleCleanupUnparseableJob(ctx, j)
+	{ // dispatch the jobs
+		switch j := j.(type) {
+		case *job.CleanupUnparseableJob:
+			err = s.handleCleanupUnparseableJob(ctx, j)
 
-	case *job.DiscoverWorkflowArtifacts:
-		err = s.handleDiscoverWorkflowArtifacts(ctx, j)
+		case *job.DiscoverWorkflowArtifacts:
+			err = s.handleDiscoverWorkflowArtifacts(ctx, j)
 
-	case *job.SyncReleaseAsset:
-		err = s.handleSyncRepositoryRelease(ctx, j)
+		case *job.SyncContainerRegistryPackage:
+			err = s.handleSyncContainerRegistryPackage(ctx, j)
 
-	case *job.SyncWorkflowArtifact:
-		err = s.handleSyncWorkflowArtifact(ctx, j)
+		case *job.SyncReleaseAsset:
+			err = s.handleSyncRepositoryRelease(ctx, j)
+
+		case *job.SyncWorkflowArtifact:
+			err = s.handleSyncWorkflowArtifact(ctx, j)
+		}
 	}
 
 	if err != nil {
-		l.Debug("Failed to handle the job",
-			zap.Error(err),
-		)
-		return
+		noRetryErr := &utils.NonRetryableError{}
+		if errors.As(err, &noRetryErr) {
+			l.Error("Non-retryable error encountered, will remove the job",
+				zap.Error(noRetryErr),
+			)
+		} else {
+			l.Warn("Retryable error encountered, keeping the job",
+				zap.Error(err),
+			)
+			return
+		}
 	}
 
 	if err := os.Remove(job.Path(j)); err != nil {

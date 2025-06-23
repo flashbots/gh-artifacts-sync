@@ -41,7 +41,18 @@ func (j *DiscoverWorkflowArtifacts) meta() *Meta {
 	return j.Meta
 }
 
-func (j *DiscoverWorkflowArtifacts) FullName() string {
+func (j *DiscoverWorkflowArtifacts) Repo() string {
+	if j == nil ||
+		j.WorkflowRunEvent == nil ||
+		j.WorkflowRunEvent.Repo == nil ||
+		j.WorkflowRunEvent.Repo.Name == nil {
+		// ---
+		return ""
+	}
+	return *j.WorkflowRunEvent.Repo.Name
+}
+
+func (j *DiscoverWorkflowArtifacts) RepoFullName() string {
 	if j == nil ||
 		j.WorkflowRunEvent == nil ||
 		j.WorkflowRunEvent.Repo == nil ||
@@ -52,7 +63,7 @@ func (j *DiscoverWorkflowArtifacts) FullName() string {
 	return *j.WorkflowRunEvent.Repo.FullName
 }
 
-func (j *DiscoverWorkflowArtifacts) Owner() string {
+func (j *DiscoverWorkflowArtifacts) RepoOwner() string {
 	if j == nil ||
 		j.WorkflowRunEvent == nil ||
 		j.WorkflowRunEvent.Repo == nil ||
@@ -62,17 +73,6 @@ func (j *DiscoverWorkflowArtifacts) Owner() string {
 		return ""
 	}
 	return *j.WorkflowRunEvent.Repo.Owner.Login
-}
-
-func (j *DiscoverWorkflowArtifacts) Repo() string {
-	if j == nil ||
-		j.WorkflowRunEvent == nil ||
-		j.WorkflowRunEvent.Repo == nil ||
-		j.WorkflowRunEvent.Repo.Name == nil {
-		// ---
-		return ""
-	}
-	return *j.WorkflowRunEvent.Repo.Name
 }
 
 func (j *DiscoverWorkflowArtifacts) WorkflowFile() string {

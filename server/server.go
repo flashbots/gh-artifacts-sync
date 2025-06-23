@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/flashbots/gh-artifacts-sync/config"
+	"github.com/flashbots/gh-artifacts-sync/gcp"
 	"github.com/flashbots/gh-artifacts-sync/httplogger"
 	"github.com/flashbots/gh-artifacts-sync/job"
 	"github.com/flashbots/gh-artifacts-sync/logutils"
@@ -28,6 +29,7 @@ type Server struct {
 
 	failure chan error
 
+	gcp    *gcp.Client
 	github *github.Client
 	logger *zap.Logger
 	server *http.Server
@@ -41,8 +43,9 @@ func New(cfg *config.Config) (*Server, error) {
 	s := &Server{
 		cfg:         cfg,
 		failure:     make(chan error, 1),
-		jobs:        make(chan job.Job, 100),
+		gcp:         gcp.New(),
 		jobInFlight: atomic.NewInt64(0),
+		jobs:        make(chan job.Job, 100),
 		logger:      zap.L(),
 		ticker:      time.NewTicker(5 * time.Second),
 	}
