@@ -101,14 +101,25 @@ func (s *Server) uploadFromZipToGcpArtifactRegistryGeneric(
 ) error {
 	l := logutils.LoggerFromContext(ctx)
 
-	artifacts, err := s.gcp.ArtifactRegistryGeneric()
-	if err != nil {
-		return err
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+
+	var artifacts *artifactregistry.ProjectsLocationsRepositoriesGenericArtifactsService
+	{ // artifacts service
+		_artifacts, err := s.gcp.ArtifactRegistryGeneric(ctx)
+		if err != nil {
+			return err
+		}
+		artifacts = _artifacts
 	}
 
-	files, err := s.gcp.ArtifactRegistryFiles()
-	if err != nil {
-		return err
+	var files *artifactregistry.ProjectsLocationsRepositoriesFilesService
+	{ // files service
+		_files, err := s.gcp.ArtifactRegistryFiles(ctx)
+		if err != nil {
+			return err
+		}
+		files = _files
 	}
 
 	z, err := zip.OpenReader(zname)
@@ -313,10 +324,9 @@ func (s *Server) uploadFromZipToGcpArtifactRegistryDocker(
 
 	var auth crauthn.Authenticator
 	{ // get authentication token
-		token, err := s.gcp.AccessToken(
-			"https://www.googleapis.com/auth/cloud-platform",
-			30*time.Second,
-		)
+		token, err := utils.WithTimeout(ctx, 10*time.Minute, func(ctx context.Context) (string, error) {
+			return s.gcp.AccessToken(ctx, "https://www.googleapis.com/auth/cloud-platform")
+		})
 		if err != nil {
 			l.Error("Failed to get gcp token", zap.Error(err))
 			errs = append(errs, err)
