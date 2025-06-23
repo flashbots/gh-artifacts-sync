@@ -176,6 +176,14 @@ func (s *Server) sanitiseWorkflowEvent(e *github.WorkflowRunEvent) error {
 		return errors.New("missing workflow status")
 	}
 
+	if e.WorkflowRun.TriggeringActor == nil {
+		return errors.New("missing workflow run triggering actor info")
+	}
+
+	if e.WorkflowRun.TriggeringActor.Login == nil {
+		return errors.New("missing workflow run triggering actor login")
+	}
+
 	return nil
 }
 

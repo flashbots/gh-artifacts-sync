@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"slices"
 	"time"
 
 	"github.com/flashbots/gh-artifacts-sync/config"
@@ -291,7 +290,10 @@ func (s *Server) uploadFromZipToGcpArtifactRegistryDocker(
 
 			platform := filepath.Dir(f.Name)
 
-			if len(dst.Platforms) > 0 && !slices.Contains(dst.Platforms, platform) {
+			if len(dst.Platforms) > 0 && !dst.HasPlatform(platform) {
+				l.Info("Ignoring platform that is not mentioned in the list",
+					zap.String("platform", platform),
+				)
 				continue
 			}
 

@@ -114,13 +114,13 @@ func (s *Server) processRegistryPackageEvent(ctx context.Context, e *github.Regi
 
 	repo, repoIsConfigured := s.cfg.Repositories[must(e.Repository.FullName)]
 	if !repoIsConfigured {
-		l.Debug("Ignoring registry package event b/c we don't have configuration for this repo")
+		l.Info("Ignoring registry package event b/c we don't have configuration for this repo")
 		return nil
 	}
 
 	container, containerIsConfigured := repo.Containers[*e.RegistryPackage.Name]
 	if !containerIsConfigured {
-		l.Debug("Ignoring registry package event b/c we don't have configuration for this container")
+		l.Info("Ignoring registry package event b/c we don't have configuration for this container")
 		return nil
 	}
 
@@ -170,7 +170,7 @@ func (s *Server) processReleaseEvent(ctx context.Context, e *github.ReleaseEvent
 
 	repo, repoIsConfigured := s.cfg.Repositories[must(e.Repo.FullName)]
 	if !repoIsConfigured {
-		l.Debug("Ignoring release event b/c we don't have configuration for this repo")
+		l.Info("Ignoring release event b/c we don't have configuration for this repo")
 		return nil
 	}
 
@@ -239,7 +239,7 @@ func (s *Server) processReleaseEvent(ctx context.Context, e *github.ReleaseEvent
 	}
 
 	if jobsCount == 0 {
-		l.Debug("Ignoring release event b/c we don't have release/asset matches")
+		l.Info("Ignoring release event b/c we don't have release/asset matches")
 	}
 
 	return utils.FlattenErrors(errs)
@@ -278,13 +278,21 @@ func (s *Server) processWorkflowEvent(ctx context.Context, e *github.WorkflowRun
 
 	repo, repoIsConfigured := s.cfg.Repositories[must(e.Repo.FullName)]
 	if !repoIsConfigured {
-		l.Debug("Ignoring workflow event b/c we don't have configuration for this repo")
+		l.Info("Ignoring workflow event b/c we don't have configuration for this repo")
 		return nil
 	}
 
-	workflow := strings.TrimPrefix(must(e.WorkflowRun.Path), ".github/workflows/")
-	if _, workflowIsConfigured := repo.Workflows[workflow]; !workflowIsConfigured {
-		l.Debug("Ignoring workflow event b/c we don't have configuration for this workflow")
+	workflowFile := strings.TrimPrefix(must(e.WorkflowRun.Path), ".github/workflows/")
+	workflow, workflowIsConfigured := repo.Workflows[workflowFile]
+	if !workflowIsConfigured {
+		l.Info("Ignoring workflow event b/c we don't have configuration for this workflow")
+		return nil
+	}
+
+	if len(workflow.Actors) > 0 && !workflow.HasActor(*e.WorkflowRun.TriggeringActor.Login) {
+		l.Info("Ignoring workflow event b/c triggering actor is not in the configured list",
+			zap.String("actor", *e.WorkflowRun.TriggeringActor.Login),
+		)
 		return nil
 	}
 

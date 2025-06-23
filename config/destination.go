@@ -16,6 +16,8 @@ type Destination struct {
 	Path      string   `yaml:"path"      json:"path"`
 	Package   string   `yaml:"package"   json:"package"`
 	Platforms []string `yaml:"platforms" json:"platforms"`
+
+	platforms map[string]struct{} `yaml:"-" json:"-"`
 }
 
 var (
@@ -50,14 +52,18 @@ func (cfg *Destination) Validate() error {
 	}
 
 	{ // platforms
+		cfg.platforms = make(map[string]struct{}, len(cfg.Platforms))
 		if len(cfg.Platforms) > 0 {
 			if !slices.Contains(destinationsWithPlatform, cfg.Type) {
 				errs = append(errs, fmt.Errorf("%w: %s",
 					errDestinationDoesNotSupportPlatforms, cfg.Type,
 				))
 			}
+
 			for _, platform := range cfg.Platforms {
-				if _, err := cr.ParsePlatform(platform); err != nil {
+				if _, err := cr.ParsePlatform(platform); err == nil {
+					cfg.platforms[platform] = struct{}{}
+				} else {
 					errs = append(errs, fmt.Errorf("%w: %w",
 						errDestinationInvalidPlatform, err,
 					))
@@ -67,4 +73,9 @@ func (cfg *Destination) Validate() error {
 	}
 
 	return utils.FlattenErrors(errs)
+}
+
+func (cfg *Destination) HasPlatform(p string) bool {
+	_, has := cfg.platforms[p]
+	return has
 }
