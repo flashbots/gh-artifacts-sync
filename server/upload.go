@@ -268,22 +268,28 @@ func (s *Server) uploadFromZipToGcpArtifactRegistryDocker(
 ) error {
 	l := logutils.LoggerFromContext(ctx)
 
-	z, err := zip.OpenReader(zname)
-	if err != nil {
-		return fmt.Errorf("failed to open zip file: %w", err)
+	var z *zip.ReadCloser
+	{ // open archive
+		_z, err := zip.OpenReader(zname)
+		if err != nil {
+			return fmt.Errorf("failed to open zip file: %w", err)
+		}
+		defer _z.Close()
+		z = _z
 	}
-	defer z.Close()
 
 	errs := make([]error, 0)
 
-	var images = make([]cr.Image, 0)
+	var images = make(map[string]cr.Image, 0)
+	var configs = make(map[string]*cr.ConfigFile, 0)
+	var digests = make(map[string]cr.Hash, 0)
 	{ // get images
 		for _, f := range z.File {
 			if f.FileInfo().IsDir() {
 				continue
 			}
 
-			platform := filepath.Dir(f.FileInfo().Name())
+			platform := filepath.Dir(f.Name)
 
 			if len(dst.Platforms) > 0 && !slices.Contains(dst.Platforms, platform) {
 				continue
@@ -299,11 +305,34 @@ func (s *Server) uploadFromZipToGcpArtifactRegistryDocker(
 				continue
 			}
 
-			images = append(images, image)
+			config, err := image.ConfigFile()
+			if err != nil {
+				l.Error("Failed to get container's config file",
+					zap.Error(err),
+					zap.String("file", f.Name),
+				)
+				errs = append(errs, err)
+				continue
+			}
+
+			digest, err := image.Digest()
+			if err != nil {
+				l.Error("Failed to get container's digest",
+					zap.Error(err),
+					zap.String("file", f.Name),
+				)
+				errs = append(errs, err)
+				continue
+			}
+
+			images[platform] = image
+			configs[platform] = config
+			digests[platform] = digest
 		}
 	}
 
 	if len(images) == 0 {
+		l.Debug("No matching platforms, skipping...")
 		return utils.FlattenErrors(errs)
 	}
 
@@ -344,39 +373,56 @@ func (s *Server) uploadFromZipToGcpArtifactRegistryDocker(
 		case 1: // single image
 			for _, image := range images {
 				// 1-iteration loop b/c there's only one
+				l.Debug("Pushing container image to the destination",
+					zap.String("reference", ref.String()),
+				)
 				uploadErr = crremote.Write(ref, image, crremote.WithAuth(auth))
 				if uploadErr != nil {
-					l.Error("Failed to push the image to the destination",
-						zap.Error(err),
+					l.Error("Failed to push container image to the destination",
+						zap.Error(uploadErr),
 						zap.String("reference", ref.String()),
 					)
 				}
+				l.Info("Pushed container image to the destination",
+					zap.String("reference", ref.String()),
+				)
 			}
 
 		default: // multi-platform image
 			var index cr.ImageIndex = crempty.Index
-			for _, image := range images {
+			for platform, image := range images {
+				desc := cr.Descriptor{
+					Platform: configs[platform].Platform(),
+					Digest:   digests[platform],
+				}
 				index = crmutate.AppendManifests(index, crmutate.IndexAddendum{
-					Add: image,
+					Add:        image,
+					Descriptor: desc,
 				})
 			}
 
+			l.Debug("Pushing container image index to the destination",
+				zap.String("reference", ref.String()),
+			)
 			uploadErr = crremote.WriteIndex(ref, index, crremote.WithAuth(auth))
 			if uploadErr != nil {
-				l.Error("Failed to push the image index to the destination",
-					zap.Error(err),
+				l.Error("Failed to push container image index to the destination",
+					zap.Error(uploadErr),
 					zap.String("reference", ref.String()),
 				)
 			}
+			l.Info("Pushed container image index to the destination",
+				zap.String("reference", ref.String()),
+			)
 		}
 	}
 
 	if uploadErr != nil {
 		transportErr := &crtransport.Error{}
-		if errors.As(err, &transportErr) && transportErr.Temporary() {
+		if errors.As(uploadErr, &transportErr) && transportErr.Temporary() {
 			errs = append(errs, uploadErr)
 		} else {
-			errs = append(errs, utils.NoRetry(err))
+			errs = append(errs, utils.NoRetry(uploadErr))
 		}
 	}
 
