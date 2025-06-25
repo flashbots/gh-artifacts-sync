@@ -18,6 +18,7 @@ func (s *Server) handleSyncContainerRegistryPackage(
 	l := logutils.LoggerFromContext(ctx).With(
 		zap.String("repo", j.GetRepoFullName()),
 		zap.String("package", j.GetPackageName()),
+		zap.String("package_url", j.GetPackageUrl()),
 		zap.String("tag", j.GetTag()),
 		zap.Int64("version_id", j.GetVersionID()),
 	)
