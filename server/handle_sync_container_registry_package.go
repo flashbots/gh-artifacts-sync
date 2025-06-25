@@ -20,6 +20,7 @@ func (s *Server) handleSyncContainerRegistryPackage(
 		zap.String("package", j.GetPackageName()),
 		zap.String("package_url", j.GetPackageUrl()),
 		zap.String("tag", j.GetTag()),
+		zap.String("digest", j.GetDigest()),
 		zap.Int64("version_id", j.GetVersionID()),
 	)
 	ctx = logutils.ContextWithLogger(ctx, l)
