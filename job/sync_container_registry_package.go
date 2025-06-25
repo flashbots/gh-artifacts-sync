@@ -98,7 +98,7 @@ func (j *SyncContainerRegistryPackage) GetPackageUrl() string {
 		if j.Package.PackageVersion.Version == nil {
 			return *j.Package.PackageVersion.PackageURL
 		}
-		return strings.TrimSuffix(*j.Package.PackageVersion.PackageURL, ":") + "@" + *j.Package.PackageVersion.PackageURL
+		return strings.TrimSuffix(*j.Package.PackageVersion.PackageURL, ":") + "@" + *j.Package.PackageVersion.Version
 	}
 	return *j.Package.Name
 }
