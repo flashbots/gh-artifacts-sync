@@ -100,7 +100,7 @@ func (j *SyncContainerRegistryPackage) GetPackageUrl() string {
 		}
 		return strings.TrimSuffix(*j.Package.PackageVersion.PackageURL, ":") + "@" + *j.Package.PackageVersion.Version
 	}
-	return *j.Package.Name
+	return *j.Package.PackageVersion.PackageURL
 }
 
 func (j *SyncContainerRegistryPackage) GetRepo() string {
