@@ -57,6 +57,9 @@ func (j *SyncContainerRegistryPackage) GetDestinations() []*config.Destination {
 }
 
 func (j *SyncContainerRegistryPackage) GetDestinationReference(dst *config.Destination) string {
+	if *j.Package.PackageVersion.ContainerMetadata.Tag.Name == "" {
+		return dst.Path + "/" + dst.Package + "@" + *j.Package.PackageVersion.ContainerMetadata.Tag.Digest
+	}
 	return dst.Path + "/" + dst.Package + ":" + *j.Package.PackageVersion.ContainerMetadata.Tag.Name
 }
 
@@ -79,6 +82,23 @@ func (j *SyncContainerRegistryPackage) GetPackageName() string {
 		j.Package.Name == nil {
 		// ---
 		return ""
+	}
+	return *j.Package.Name
+}
+
+func (j *SyncContainerRegistryPackage) GetPackageUrl() string {
+	if j == nil ||
+		j.Package == nil ||
+		j.Package.PackageVersion == nil ||
+		j.Package.PackageVersion.PackageURL == nil {
+		// ---
+		return ""
+	}
+	if strings.HasSuffix(*j.Package.PackageVersion.PackageURL, ":") { // tag-less
+		if j.Package.PackageVersion.Version == nil {
+			return *j.Package.PackageVersion.PackageURL
+		}
+		return strings.TrimSuffix(*j.Package.PackageVersion.PackageURL, ":") + "@" + *j.Package.PackageVersion.PackageURL
 	}
 	return *j.Package.Name
 }

@@ -71,10 +71,10 @@ func (s *Server) downloadGithubContainerRegistryPackage(
 
 	var ref crname.Reference
 	{ // get reference
-		_ref, err := crname.ParseReference(*j.Package.PackageVersion.PackageURL)
+		_ref, err := crname.ParseReference(j.GetPackageUrl())
 		if err != nil {
 			return "", fmt.Errorf("failed to parse container image url: %s: %w",
-				*j.Package.PackageVersion.PackageURL, err,
+				j.GetPackageUrl(), err,
 			)
 		}
 		ref = _ref
@@ -85,7 +85,7 @@ func (s *Server) downloadGithubContainerRegistryPackage(
 		_desc, err := crremote.Get(ref, crremote.WithAuth(auth))
 		if err != nil {
 			return "", fmt.Errorf("failed to get a descriptor for container image: %s: %w",
-				*j.Package.PackageVersion.PackageURL, err,
+				j.GetPackageUrl(), err,
 			)
 		}
 		desc = _desc
@@ -120,7 +120,7 @@ func (s *Server) downloadGithubContainerRegistryPackage(
 			indexManifest, err := index.IndexManifest()
 			if err != nil {
 				return "", fmt.Errorf("failed to get image index manifest from a descriptor: %s: %s: %w",
-					*j.Package.PackageVersion.PackageURL, desc.Digest.String(), err,
+					j.GetPackageUrl(), desc.Digest.String(), err,
 				)
 			}
 
@@ -137,7 +137,7 @@ func (s *Server) downloadGithubContainerRegistryPackage(
 				image, err := index.Image(desc.Digest)
 				if err != nil {
 					return "", fmt.Errorf("failed to get image from an index: %s: %s: %w",
-						*j.Package.PackageVersion.PackageURL, desc.Digest, err,
+						j.GetPackageUrl(), desc.Digest, err,
 					)
 				}
 
@@ -148,7 +148,7 @@ func (s *Server) downloadGithubContainerRegistryPackage(
 
 	if len(images) == 0 {
 		return "", fmt.Errorf("no images to download: %s",
-			*j.Package.PackageVersion.PackageURL,
+			j.GetPackageUrl(),
 		)
 	}
 
@@ -173,7 +173,7 @@ func (s *Server) downloadGithubContainerRegistryPackage(
 			digest, err := image.Digest()
 			if err != nil {
 				return "", fmt.Errorf("failed to get image digest: %s: %w",
-					*j.Package.PackageVersion.PackageURL, err,
+					j.GetPackageUrl(), err,
 				)
 			}
 

@@ -56,7 +56,3 @@ docker_manifests:
     image_templates:
       - "ghcr.io/flashbots/gh-artifacts-sync:{{ .Tag }}-amd64"
       - "ghcr.io/flashbots/gh-artifacts-sync:{{ .Tag }}-arm64"
-
-# after:
-#   hooks:
-#     - docker save "ghcr.io/flashbots/gh-artifacts-sync:{{ .Tag }}" --output ./gh-artifacts-sync-{{ .Tag }}.tar
