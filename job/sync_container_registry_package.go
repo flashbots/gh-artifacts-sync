@@ -26,9 +26,10 @@ func NewSyncContainerRegistryPackage(
 ) *SyncContainerRegistryPackage {
 	var id string
 	if package_ != nil &&
-		package_.ID != nil {
+		package_.PackageVersion != nil &&
+		package_.PackageVersion.ID != nil {
 		// ---
-		id = fmt.Sprintf("%s-%d", TypeSyncContainerRegistryPackage, *package_.ID)
+		id = fmt.Sprintf("%s-%d", TypeSyncContainerRegistryPackage, *package_.PackageVersion.ID)
 	} else {
 		id = fmt.Sprintf("%s-noid-%d", TypeSyncContainerRegistryPackage, rand.Int64())
 	}

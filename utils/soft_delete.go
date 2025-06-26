@@ -40,7 +40,7 @@ func copy(from, to string) error {
 	}
 	defer src.Close()
 
-	dst, err := os.OpenFile(to, os.O_WRONLY|os.O_CREATE, 0640)
+	dst, err := os.OpenFile(to, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0640)
 	if err != nil {
 		return err
 	}
