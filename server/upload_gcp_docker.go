@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"path/filepath"
 	"time"
 
 	"github.com/flashbots/gh-artifacts-sync/config"
@@ -26,6 +25,13 @@ import (
 	crtarball "github.com/google/go-containerregistry/pkg/v1/tarball"
 )
 
+type container struct {
+	config   *cr.ConfigFile
+	digest   cr.Hash
+	image    cr.Image
+	manifest *cr.Manifest
+}
+
 func (s *Server) uploadFromZipToGcpArtifactRegistryDocker(
 	ctx context.Context,
 	j job.UploadableContainer,
@@ -44,63 +50,101 @@ func (s *Server) uploadFromZipToGcpArtifactRegistryDocker(
 		z = _z
 	}
 
-	errs := make([]error, 0)
-
-	var images = make(map[string]cr.Image, 0)
-	var configs = make(map[string]*cr.ConfigFile, 0)
-	var digests = make(map[string]cr.Hash, 0)
+	var (
+		attestations = make(map[string][]*container, 0)
+		containers   = make(map[string]*container, 0)
+		errs         = make([]error, 0)
+	)
 	{ // get images
 		for _, f := range z.File {
 			if f.FileInfo().IsDir() {
 				continue
 			}
 
-			platform := filepath.Dir(f.Name)
-
-			if len(dst.Platforms) > 0 && !dst.HasPlatform(platform) {
-				l.Info("Ignoring platform that is not mentioned in the list",
-					zap.String("platform", platform),
-				)
-				continue
-			}
+			l := l.With(
+				zap.String("file", f.Name),
+			)
 
 			image, err := crtarball.Image(zipFileOpener(f), nil)
 			if err != nil {
-				l.Error("Failed to open container tarball",
-					zap.Error(err),
-					zap.String("file", f.Name),
-				)
+				l.Error("Failed to open container tarball", zap.Error(err))
+				errs = append(errs, err)
+				continue
+			}
+
+			manifest, err := image.Manifest()
+			if err != nil {
+				l.Error("Failed to get container's manifest", zap.Error(err))
 				errs = append(errs, err)
 				continue
 			}
 
 			config, err := image.ConfigFile()
 			if err != nil {
-				l.Error("Failed to get container's config file",
-					zap.Error(err),
-					zap.String("file", f.Name),
-				)
+				l.Error("Failed to get container's config file", zap.Error(err))
 				errs = append(errs, err)
 				continue
 			}
 
 			digest, err := image.Digest()
 			if err != nil {
-				l.Error("Failed to get container's digest",
-					zap.Error(err),
-					zap.String("file", f.Name),
-				)
+				l.Error("Failed to get container's digest", zap.Error(err))
 				errs = append(errs, err)
 				continue
 			}
 
-			images[platform] = image
-			configs[platform] = config
-			digests[platform] = digest
+			c := &container{
+				config:   config,
+				digest:   digest,
+				image:    image,
+				manifest: manifest,
+			}
+
+			if len(dst.Platforms) == 0 { // no filtering, include all
+				containers[digest.String()] = c
+				l.Debug("Including a manifest",
+					zap.String("digest", digest.String()),
+					zap.String("platform", config.Platform().String()),
+					zap.Any("annotations", manifest.Annotations),
+				)
+				continue
+			}
+
+			if dst.HasPlatform(config.Platform()) {
+				containers[digest.String()] = c
+				for _, attestation := range attestations[digest.String()] {
+					containers[attestation.digest.String()] = attestation
+					l.Debug("Including an attestation",
+						zap.String("digest", attestation.digest.String()),
+						zap.Any("annotations", attestation.manifest.Annotations),
+					)
+				}
+				delete(attestations, digest.String())
+				continue
+			}
+
+			if manifest.Annotations["vnd.docker.reference.type"] == "attestation-manifest" {
+				if ref := manifest.Annotations["vnd.docker.reference.digest"]; ref != "" {
+					if _, alreadySeen := containers[ref]; alreadySeen {
+						containers[digest.String()] = c
+						l.Debug("Including an attestation",
+							zap.String("digest", digest.String()),
+							zap.Any("annotations", manifest.Annotations),
+						)
+						continue
+					}
+
+					// maybe it will come after
+					if _, exists := attestations[ref]; !exists {
+						attestations[ref] = make([]*container, 0)
+					}
+					attestations[ref] = append(attestations[ref], c)
+				}
+			}
 		}
 	}
 
-	if len(images) == 0 {
+	if len(containers) == 0 {
 		l.Debug("No matching platforms, skipping...")
 		return utils.FlattenErrors(errs)
 	}
@@ -138,51 +182,46 @@ func (s *Server) uploadFromZipToGcpArtifactRegistryDocker(
 
 	var uploadErr error
 	{ // upload
-		switch len(images) {
+		switch len(containers) {
 		case 1: // single image
-			for _, image := range images {
+			for _, c := range containers {
+				l := l.With(
+					zap.String("reference", ref.String()),
+					zap.String("digest", c.digest.String()),
+					zap.String("platform", c.config.Platform().String()),
+				)
 				// 1-iteration loop b/c there's only one
-				l.Debug("Pushing container image to the destination",
-					zap.String("reference", ref.String()),
-				)
-				uploadErr = crremote.Write(ref, image, crremote.WithAuth(auth))
+				l.Debug("Pushing container manifest to the destination")
+				uploadErr = crremote.Write(ref, c.image, crremote.WithAuth(auth))
 				if uploadErr != nil {
-					l.Error("Failed to push container image to the destination",
-						zap.Error(uploadErr),
-						zap.String("reference", ref.String()),
-					)
+					l.Error("Failed to push container image to the destination", zap.Error(uploadErr))
 				}
-				l.Info("Pushed container image to the destination",
-					zap.String("reference", ref.String()),
-				)
+				l.Info("Pushed container image to the destination")
 			}
 
 		default: // multi-platform image
+			l := l.With(
+				zap.String("reference", ref.String()),
+			)
 			var index cr.ImageIndex = crempty.Index
-			for platform, image := range images {
-				desc := cr.Descriptor{
-					Platform: configs[platform].Platform(),
-					Digest:   digests[platform],
-				}
+			for _, c := range containers {
 				index = crmutate.AppendManifests(index, crmutate.IndexAddendum{
-					Add:        image,
-					Descriptor: desc,
+					Add: c.image,
+
+					Descriptor: cr.Descriptor{
+						Annotations: c.manifest.Annotations,
+						Digest:      c.digest,
+						Platform:    c.config.Platform(),
+					},
 				})
 			}
 
-			l.Debug("Pushing container image index to the destination",
-				zap.String("reference", ref.String()),
-			)
+			l.Debug("Pushing container index to the destination")
 			uploadErr = crremote.WriteIndex(ref, index, crremote.WithAuth(auth))
 			if uploadErr != nil {
-				l.Error("Failed to push container image index to the destination",
-					zap.Error(uploadErr),
-					zap.String("reference", ref.String()),
-				)
+				l.Error("Failed to push container image index to the destination", zap.Error(uploadErr))
 			}
-			l.Info("Pushed container image index to the destination",
-				zap.String("reference", ref.String()),
-			)
+			l.Info("Pushed container image index to the destination")
 		}
 	}
 

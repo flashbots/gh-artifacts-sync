@@ -57,10 +57,13 @@ func (j *SyncContainerRegistryPackage) GetDestinations() []*config.Destination {
 }
 
 func (j *SyncContainerRegistryPackage) GetDestinationReference(dst *config.Destination) string {
-	if *j.Package.PackageVersion.ContainerMetadata.Tag.Name == "" {
-		return dst.Path + "/" + dst.Package + "@" + *j.Package.PackageVersion.ContainerMetadata.Tag.Digest
+	tag := *j.Package.PackageVersion.ContainerMetadata.Tag.Name
+	if tag == "" {
+		tag = strings.ReplaceAll(
+			*j.Package.PackageVersion.ContainerMetadata.Tag.Digest, ":", "-",
+		)
 	}
-	return dst.Path + "/" + dst.Package + ":" + *j.Package.PackageVersion.ContainerMetadata.Tag.Name
+	return dst.Path + "/" + dst.Package + ":" + tag
 }
 
 func (j *SyncContainerRegistryPackage) GetDigest() string {

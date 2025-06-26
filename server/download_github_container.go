@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/flashbots/gh-artifacts-sync/job"
@@ -30,9 +31,9 @@ func (s *Server) downloadGithubContainer(
 
 	var downloadsDir string
 	{ // create container downloads dir
-		downloadsDir = filepath.Join(
-			s.cfg.Dir.Downloads, j.GetRepoOwner(), j.GetRepo(), "containers", j.GetPackageName(), j.GetTag(),
-		)
+		downloadsDir = strings.ReplaceAll(filepath.Join(
+			s.cfg.Dir.Downloads, j.GetRepoOwner(), j.GetRepo(), "containers", j.GetPackageName(), j.GetDigest(),
+		), ":", "-")
 		if err := os.MkdirAll(downloadsDir, 0750); err != nil {
 			return "", fmt.Errorf("failed to create container download directory: %s: %w",
 				downloadsDir, err,
@@ -89,7 +90,7 @@ func (s *Server) downloadGithubContainer(
 		desc = _desc
 	}
 
-	var images = make(map[string]cr.Image)
+	var images = make(map[string][]cr.Image)
 	{ // get images
 		switch {
 		case desc.MediaType.IsImage():
@@ -98,16 +99,21 @@ func (s *Server) downloadGithubContainer(
 				return "", fmt.Errorf("failed to retrieve container image: %w", err)
 			}
 
-			platform := ""
+			platform := "unknown/unknown"
 			if desc.Platform != nil {
 				platform = desc.Platform.String()
 			}
-
-			if _, exists := images[platform]; exists {
-				return "", fmt.Errorf("invalid container image: duplicate platform: %s", platform)
+			if _, exists := images[platform]; !exists {
+				images[platform] = make([]cr.Image, 0)
 			}
 
-			images[platform] = image
+			images[platform] = append(images[platform], image)
+
+			l.Debug("Downloaded a manifest",
+				zap.String("digest", desc.Digest.String()),
+				zap.String("platform", platform),
+				zap.Any("annotations", desc.Annotations),
+			)
 
 		case desc.MediaType.IsIndex():
 			index, err := crremote.Index(ref, crremote.WithAuth(auth))
@@ -122,14 +128,15 @@ func (s *Server) downloadGithubContainer(
 				)
 			}
 
-			for _, desc := range indexManifest.Manifests {
-				if !desc.MediaType.IsImage() || desc.Platform == nil {
-					continue
-				}
+			l.Debug("Downloaded an index",
+				zap.String("digest", desc.Digest.String()),
+				zap.String("reference", ref.Name()),
+				zap.Any("annotations", indexManifest.Annotations),
+			)
 
-				platform := desc.Platform.String()
-				if _, exists := images[platform]; exists {
-					return "", fmt.Errorf("invalid container image: duplicate platform: %s", platform)
+			for _, desc := range indexManifest.Manifests {
+				if !desc.MediaType.IsImage() {
+					continue
 				}
 
 				image, err := index.Image(desc.Digest)
@@ -139,7 +146,21 @@ func (s *Server) downloadGithubContainer(
 					)
 				}
 
-				images[platform] = image
+				platform := "unknown/unknown"
+				if desc.Platform != nil {
+					platform = desc.Platform.String()
+				}
+				if _, exists := images[platform]; !exists {
+					images[platform] = make([]cr.Image, 0)
+				}
+
+				images[platform] = append(images[platform], image)
+
+				l.Debug("Downloaded a manifest",
+					zap.String("digest", desc.Digest.String()),
+					zap.String("platform", platform),
+					zap.Any("annotations", desc.Annotations),
+				)
 			}
 		}
 	}
@@ -167,35 +188,35 @@ func (s *Server) downloadGithubContainer(
 		zipper := zip.NewWriter(file)
 		defer zipper.Close()
 
-		for platform, image := range images {
-			digest, err := image.Digest()
-			if err != nil {
-				return "", fmt.Errorf("failed to get image digest: %s: %w",
-					j.GetPackageUrl(), err,
+		for platform, _images := range images {
+			for _, image := range _images {
+				digest, err := image.Digest()
+				if err != nil {
+					return "", fmt.Errorf("failed to get image digest: %s: %w",
+						j.GetPackageUrl(), err,
+					)
+				}
+
+				stream, err := zipper.Create(filepath.Join(platform, digest.Hex+".tar"))
+				if err != nil {
+					return "", fmt.Errorf("failed to create add container tarball to file: %w", err)
+				}
+
+				l.Debug("Archiving container manifest...",
+					zap.String("digest", digest.String()),
+				)
+
+				start := time.Now()
+
+				if err := crtarball.Write(ref, image, stream); err != nil {
+					return "", fmt.Errorf("failed to write container tarball: %w", err)
+				}
+
+				l.Info("Archived a container manifest",
+					zap.String("digest", digest.String()),
+					zap.Duration("duration", time.Since(start)),
 				)
 			}
-
-			stream, err := zipper.Create(filepath.Join(platform, digest.Hex+".tar"))
-			if err != nil {
-				return "", fmt.Errorf("failed to create add container tarball to file: %w", err)
-			}
-
-			l.Debug("Downloading container image...",
-				zap.String("digest", digest.String()),
-				zap.String("platform", platform),
-			)
-
-			start := time.Now()
-
-			if err := crtarball.Write(ref, image, stream); err != nil {
-				return "", fmt.Errorf("failed to write container tarball: %w", err)
-			}
-
-			l.Info("Downloaded a container image",
-				zap.String("digest", digest.String()),
-				zap.String("platform", platform),
-				zap.Duration("duration", time.Since(start)),
-			)
 		}
 	}
 

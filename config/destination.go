@@ -75,7 +75,7 @@ func (cfg *Destination) Validate() error {
 	return utils.FlattenErrors(errs)
 }
 
-func (cfg *Destination) HasPlatform(p string) bool {
-	_, has := cfg.platforms[p]
+func (cfg *Destination) HasPlatform(p *cr.Platform) bool {
+	_, has := cfg.platforms[p.String()] // TODO: enable globbing and matching
 	return has
 }
