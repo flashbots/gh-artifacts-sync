@@ -212,7 +212,7 @@ func (s *Server) downloadGithubContainer(
 					return "", fmt.Errorf("failed to write container tarball: %w", err)
 				}
 
-				l.Info("Archived a container manifest",
+				l.Debug("Archived a container manifest",
 					zap.String("digest", digest.String()),
 					zap.Duration("duration", time.Since(start)),
 				)
