@@ -9,48 +9,39 @@ import (
 )
 
 type Dir struct {
-	Downloads string `yaml:"downloads" json:"downloads"`
-	Jobs      string `yaml:"jobs"      json:"jobs"`
+	Downloads string `yaml:"downloads"   json:"downloads"`
+	Jobs      string `yaml:"jobs"        json:"jobs"`
 }
 
 var (
-	errDirNotDirectory = errors.New("not a directory")
+	errDirFailedToAccess = errors.New("failed to access a directory")
+	errDirFailedToCreate = errors.New("failed to create a directory")
+	errDirNotDirectory   = errors.New("not a directory")
 )
 
 func (cfg *Dir) Validate() error {
 	errs := make([]error, 0)
 
-	{ // artifacts
-		if info, err := os.Stat(cfg.Downloads); err != nil {
+	for _, dir := range []string{cfg.Downloads, cfg.Jobs} {
+		if dir == "" {
+			continue
+		}
+		if info, err := os.Stat(dir); err != nil {
 			if !os.IsNotExist(err) {
-				if errMkdir := os.Mkdir(cfg.Downloads, 0640); errMkdir != nil {
-					errs = append(errs, err, errMkdir)
+				if errMkdir := os.Mkdir(dir, 0640); errMkdir != nil {
+					errs = append(errs, fmt.Errorf("%w: %s: %w",
+						errDirFailedToCreate, dir, err,
+					))
 				}
 			} else {
-				errs = append(errs, err)
-			}
-		} else {
-			if !info.IsDir() {
-				errs = append(errs, fmt.Errorf("%w: %s",
-					errDirNotDirectory, cfg.Downloads,
+				errs = append(errs, fmt.Errorf("%w: %s: %w",
+					errDirFailedToAccess, dir, err,
 				))
 			}
-		}
-	}
-
-	{ // jobs
-		if info, err := os.Stat(cfg.Jobs); err != nil {
-			if !os.IsNotExist(err) {
-				if errMkdir := os.Mkdir(cfg.Jobs, 0640); errMkdir != nil {
-					errs = append(errs, err, errMkdir)
-				}
-			} else {
-				errs = append(errs, err)
-			}
 		} else {
 			if !info.IsDir() {
 				errs = append(errs, fmt.Errorf("%w: %s",
-					errDirNotDirectory, cfg.Jobs,
+					errDirNotDirectory, dir,
 				))
 			}
 		}

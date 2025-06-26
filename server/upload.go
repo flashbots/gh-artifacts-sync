@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -22,11 +23,9 @@ func (s *Server) uploadFromZipAndDelete(
 	l := logutils.LoggerFromContext(ctx)
 
 	defer func() {
-		if err := os.Remove(zname); err != nil {
-			l.Error("Failed to remove zip file", zap.Error(err))
-		}
+		s.RemoveDownload(ctx, zname)
 		dir := filepath.Dir(zname)
-		if err := os.Remove(dir); err != nil {
+		if err := os.Remove(dir); err != nil && !errors.Is(err, os.ErrNotExist) {
 			l.Error("Failed to remove downloads dir", zap.Error(err))
 		}
 	}()

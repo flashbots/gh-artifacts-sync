@@ -2,8 +2,6 @@ package server
 
 import (
 	"context"
-	"errors"
-	"os"
 
 	"github.com/flashbots/gh-artifacts-sync/job"
 	"github.com/flashbots/gh-artifacts-sync/logutils"
@@ -25,10 +23,11 @@ func (s *Server) handleSyncWorkflowArtifact(
 
 	l.Info("Synchronising workflow artifact...")
 
-	zname, err := s.downloadGithubWorkflowArtifact(ctx, j)
+	zname, err := s.downloadGithubArtifact(ctx, j)
 	if err != nil {
 		l.Error("Failed to download workflow artifact", zap.Error(err))
-		return errors.Join(err, os.Remove(zname))
+		s.RemoveDownload(ctx, zname)
+		return err
 	}
 
 	if err := s.uploadFromZipAndDelete(ctx, j, zname); err != nil {

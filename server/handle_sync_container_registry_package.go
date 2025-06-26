@@ -2,8 +2,6 @@ package server
 
 import (
 	"context"
-	"errors"
-	"os"
 
 	"github.com/flashbots/gh-artifacts-sync/job"
 	"github.com/flashbots/gh-artifacts-sync/logutils"
@@ -27,10 +25,11 @@ func (s *Server) handleSyncContainerRegistryPackage(
 
 	l.Info("Synchronising container registry package...")
 
-	zname, err := s.downloadGithubContainerRegistryPackage(ctx, j)
+	zname, err := s.downloadGithubContainer(ctx, j)
 	if err != nil {
 		l.Error("Failed to download container registry package", zap.Error(err))
-		return errors.Join(err, os.Remove(zname))
+		s.RemoveDownload(ctx, zname)
+		return err
 	}
 
 	if err := s.uploadFromZipAndDelete(ctx, j, zname); err != nil {

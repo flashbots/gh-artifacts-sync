@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"io/fs"
-	"os"
 	"path/filepath"
 	"time"
 
@@ -93,10 +92,5 @@ func (s *Server) handleJob(ctx context.Context, j job.Job) {
 		}
 	}
 
-	if err := os.Remove(job.Path(j)); err != nil {
-		l.Error("Failed to remove completed job",
-			zap.Error(err),
-			zap.String("path", job.Path(j)),
-		)
-	}
+	s.RemoveJob(ctx, j)
 }

@@ -14,6 +14,7 @@ snapshot:
 
 .PHONY: help
 help:
+	@go run github.com/flashbots/gh-artifacts-sync/cmd --help
 	@go run github.com/flashbots/gh-artifacts-sync/cmd serve --help
 
 .PHONY: serve

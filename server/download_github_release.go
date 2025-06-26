@@ -11,7 +11,7 @@ import (
 	"github.com/flashbots/gh-artifacts-sync/job"
 )
 
-func (s *Server) downloadGithubReleaseAsset(
+func (s *Server) downloadGithubRelease(
 	ctx context.Context,
 	j *job.SyncReleaseAsset,
 ) (string, error) {

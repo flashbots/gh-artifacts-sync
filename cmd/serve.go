@@ -54,6 +54,26 @@ func CommandServe(cfg *config.Config) *cli.Command {
 			Usage:       "a `path` to the directory where scheduled jobs will be persisted",
 			Value:       "./jobs",
 		},
+
+		&cli.StringFlag{ // --dir-soft-delete-downloads
+			Aliases:     []string{"dir.soft_delete_downloads"},
+			Category:    strings.ToUpper(categoryDir),
+			Destination: &cfg.SoftDelete.Downloads,
+			EnvVars:     []string{envPrefix + strings.ToUpper(categoryDir) + "_SOFT_DELETE_DOWNLOADS"},
+			Name:        categoryDir + "-soft-delete-downloads",
+			Usage:       "a `path` to the directory where finalised downloaded will be moved to instead of deleting",
+			Value:       "",
+		},
+
+		&cli.StringFlag{ // --dir-soft-delete-jobs
+			Aliases:     []string{"dir.soft_delete_jobs"},
+			Category:    strings.ToUpper(categoryDir),
+			Destination: &cfg.SoftDelete.Jobs,
+			EnvVars:     []string{envPrefix + strings.ToUpper(categoryDir) + "_SOFT_DELETE_JOBS"},
+			Name:        categoryDir + "-soft-delete-jobs",
+			Usage:       "a `path` to the directory where complete jobs be moved instead of deleting",
+			Value:       "",
+		},
 	}
 
 	githubFlags := []cli.Flag{ // --github-xxx

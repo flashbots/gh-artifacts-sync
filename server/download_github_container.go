@@ -22,7 +22,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func (s *Server) downloadGithubContainerRegistryPackage(
+func (s *Server) downloadGithubContainer(
 	ctx context.Context,
 	j *job.SyncContainerRegistryPackage,
 ) (string, error) {

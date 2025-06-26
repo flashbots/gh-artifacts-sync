@@ -65,8 +65,10 @@ USAGE:
 OPTIONS:
    DIR
 
-   --dir-artifacts path, --dir.artifacts path  a path to the directory where downloaded artifacts will be temporarily stored (default: "./artifacts") [$GH_ARTIFACTS_SYNC_DIR_ARTIFACTS]
-   --dir-jobs path, --dir.jobs path            a path to the directory where scheduled jobs will be persisted (default: "./jobs") [$GH_ARTIFACTS_SYNC_DIR_JOBS]
+   --dir-downloads path, --dir.downloads path                          a path to the directory where downloaded artifacts will be temporarily stored (default: "./downloads") [$GH_ARTIFACTS_SYNC_DIR_DOWNLOADS]
+   --dir-jobs path, --dir.jobs path                                    a path to the directory where scheduled jobs will be persisted (default: "./jobs") [$GH_ARTIFACTS_SYNC_DIR_JOBS]
+   --dir-soft-delete-downloads path, --dir.soft_delete_downloads path  a path to the directory where finalised downloaded will be moved to instead of deleting [$GH_ARTIFACTS_SYNC_DIR_SOFT_DELETE_DOWNLOADS]
+   --dir-soft-delete-jobs path, --dir.soft_delete_jobs path            a path to the directory where complete jobs be moved instead of deleting [$GH_ARTIFACTS_SYNC_DIR_SOFT_DELETE_JOBS]
 
    GITHUB
 

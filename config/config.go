@@ -16,6 +16,7 @@ type Config struct {
 	Log          *Log                   `yaml:"log"          json:"log"`
 	Repositories map[string]*Repository `yaml:"repositories" json:"repositories"`
 	Server       *Server                `yaml:"server"       json:"server"`
+	SoftDelete   *Dir                   `yaml:"soft_delete"  json:"soft_delete"`
 }
 
 var (
@@ -24,10 +25,11 @@ var (
 
 func New() *Config {
 	return &Config{
-		Dir:    &Dir{},
-		Github: &Github{App: &GithubApp{}},
-		Log:    &Log{},
-		Server: &Server{},
+		Dir:        &Dir{},
+		Github:     &Github{App: &GithubApp{}},
+		Log:        &Log{},
+		Server:     &Server{},
+		SoftDelete: &Dir{},
 	}
 }
 

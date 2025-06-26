@@ -2,8 +2,6 @@ package server
 
 import (
 	"context"
-	"errors"
-	"os"
 
 	"github.com/flashbots/gh-artifacts-sync/job"
 	"github.com/flashbots/gh-artifacts-sync/logutils"
@@ -25,10 +23,11 @@ func (s *Server) handleSyncRepositoryRelease(
 
 	l.Info("Synchronising release asset...")
 
-	zname, err := s.downloadGithubReleaseAsset(ctx, j)
+	zname, err := s.downloadGithubRelease(ctx, j)
 	if err != nil {
 		l.Error("Failed to download release asset", zap.Error(err))
-		return errors.Join(err, os.Remove(zname))
+		s.RemoveDownload(ctx, zname)
+		return err
 	}
 
 	if err := s.uploadFromZipAndDelete(ctx, j, zname); err != nil {
