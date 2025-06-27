@@ -214,41 +214,38 @@ func (s *Server) prepareImageForUpload(
 		ref = _ref
 	}
 
-	switch indexManifest {
-	case nil:
+	if indexManifest == nil || len(indexManifest.Manifests) == 1 {
 		for _, c := range containers {
 			// there's only 1 if there's no index
 			return ref, c.image, nil, utils.FlattenErrors(errs)
 		}
-
-	default:
-		var index cr.ImageIndex = crempty.Index
-		for _, desc := range indexManifest.Manifests {
-			originalDigest := desc.Digest.String()
-			container := containers[originalDigest]
-			annotations := desc.Annotations
-
-			if annotations["vnd.docker.reference.type"] == "attestation-manifest" {
-				if annotationOriginalDigest, ok := annotations["vnd.docker.reference.digest"]; ok {
-					if reference, ok := containers[annotationOriginalDigest]; ok {
-						annotations["vnd.docker.reference.digest"] = reference.digest.String()
-					}
-				}
-			}
-
-			index = crmutate.AppendManifests(index, crmutate.IndexAddendum{
-				Add: container.image,
-
-				Descriptor: cr.Descriptor{
-					Annotations: annotations,
-					Digest:      container.digest,
-					Platform:    container.config.Platform(),
-				},
-			})
-		}
-
-		return ref, nil, index, utils.FlattenErrors(errs)
+		return nil, nil, nil, nil
 	}
 
-	return nil, nil, nil, utils.FlattenErrors(errs)
+	var index cr.ImageIndex = crempty.Index
+	for _, desc := range indexManifest.Manifests {
+		originalDigest := desc.Digest.String()
+		container := containers[originalDigest]
+		annotations := desc.Annotations
+
+		if annotations["vnd.docker.reference.type"] == "attestation-manifest" {
+			if annotationOriginalDigest, ok := annotations["vnd.docker.reference.digest"]; ok {
+				if reference, ok := containers[annotationOriginalDigest]; ok {
+					annotations["vnd.docker.reference.digest"] = reference.digest.String()
+				}
+			}
+		}
+
+		index = crmutate.AppendManifests(index, crmutate.IndexAddendum{
+			Add: container.image,
+
+			Descriptor: cr.Descriptor{
+				Annotations: annotations,
+				Digest:      container.digest,
+				Platform:    container.config.Platform(),
+			},
+		})
+	}
+
+	return ref, nil, index, utils.FlattenErrors(errs)
 }
