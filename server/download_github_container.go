@@ -3,6 +3,7 @@ package server
 import (
 	"archive/zip"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -90,11 +91,12 @@ func (s *Server) downloadGithubContainer(
 		desc = _desc
 	}
 
+	var indexManifest *cr.IndexManifest
 	var images = make(map[string][]cr.Image)
 	{ // get images
 		switch {
 		case desc.MediaType.IsImage():
-			image, err := crremote.Image(ref, crremote.WithAuth(auth))
+			img, err := crremote.Image(ref, crremote.WithAuth(auth))
 			if err != nil {
 				return "", fmt.Errorf("failed to retrieve container image: %w", err)
 			}
@@ -107,7 +109,7 @@ func (s *Server) downloadGithubContainer(
 				images[platform] = make([]cr.Image, 0)
 			}
 
-			images[platform] = append(images[platform], image)
+			images[platform] = append(images[platform], img)
 
 			l.Debug("Downloaded a manifest",
 				zap.String("digest", desc.Digest.String()),
@@ -121,7 +123,7 @@ func (s *Server) downloadGithubContainer(
 				return "", fmt.Errorf("failed to retrieve container index: %w", err)
 			}
 
-			indexManifest, err := index.IndexManifest()
+			indexManifest, err = index.IndexManifest()
 			if err != nil {
 				return "", fmt.Errorf("failed to get image index manifest from a descriptor: %s: %s: %w",
 					j.GetPackageUrl(), desc.Digest.String(), err,
@@ -139,7 +141,7 @@ func (s *Server) downloadGithubContainer(
 					continue
 				}
 
-				image, err := index.Image(desc.Digest)
+				img, err := index.Image(desc.Digest)
 				if err != nil {
 					return "", fmt.Errorf("failed to get image from an index: %s: %s: %w",
 						j.GetPackageUrl(), desc.Digest, err,
@@ -154,7 +156,7 @@ func (s *Server) downloadGithubContainer(
 					images[platform] = make([]cr.Image, 0)
 				}
 
-				images[platform] = append(images[platform], image)
+				images[platform] = append(images[platform], img)
 
 				l.Debug("Downloaded a manifest",
 					zap.String("digest", desc.Digest.String()),
@@ -188,7 +190,26 @@ func (s *Server) downloadGithubContainer(
 		zipper := zip.NewWriter(file)
 		defer zipper.Close()
 
+		if desc.MediaType.IsIndex() {
+			stream, err := zipper.Create(filepath.Join(desc.Digest.Hex + ".json"))
+			if err != nil {
+				return "", fmt.Errorf("failed to add index json to file: %w", err)
+			}
+
+			l.Debug("Archiving index manifest...",
+				zap.String("digest", desc.Digest.String()),
+			)
+
+			if err := json.NewEncoder(stream).Encode(indexManifest); err != nil {
+				return "", fmt.Errorf("failed to write index json to file: %w", err)
+			}
+		}
+
 		for platform, _images := range images {
+			if platform == "" {
+				continue
+			}
+
 			for _, image := range _images {
 				digest, err := image.Digest()
 				if err != nil {
@@ -197,9 +218,11 @@ func (s *Server) downloadGithubContainer(
 					)
 				}
 
-				stream, err := zipper.Create(filepath.Join(platform, digest.Hex+".tar"))
+				stream, err := zipper.Create(
+					filepath.Join(platform, strings.ReplaceAll(digest.String(), ":", "-")+".tar"),
+				)
 				if err != nil {
-					return "", fmt.Errorf("failed to create add container tarball to file: %w", err)
+					return "", fmt.Errorf("failed to add container tarball to file: %w", err)
 				}
 
 				l.Debug("Archiving container manifest...",
