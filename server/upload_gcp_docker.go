@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"time"
 
@@ -28,9 +29,21 @@ func (s *Server) uploadFromZipToGcpArtifactRegistryDocker(
 ) error {
 	l := logutils.LoggerFromContext(ctx)
 
-	ref, image, index, err := s.prepareImageForUpload(ctx, j, zname, dst)
+	var z *zip.ReadCloser
+	{ // open archive
+		_z, err := zip.OpenReader(zname)
+		if err != nil {
+			return fmt.Errorf("failed to open zip file: %w", err)
+		}
+		defer _z.Close()
+		z = _z
+	}
+
+	ref, image, index, err := s.prepareImageForUpload(ctx, j, z, dst)
 	if ref == nil || (image == nil && index == nil) {
-		l.Error("Failed to prepare image for upload", zap.Error(err))
+		if err != nil {
+			l.Error("Failed to prepare image for upload", zap.Error(err))
+		}
 		return err
 	} else if err != nil {
 		l.Warn("There were issues while preparing image for upload", zap.Error(err))

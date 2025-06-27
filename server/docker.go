@@ -91,29 +91,19 @@ func (s *Server) prepareIndexManifestForDestination(
 func (s *Server) prepareImageForUpload(
 	ctx context.Context,
 	j job.UploadableContainer,
-	zname string,
+	stream *zip.ReadCloser,
 	dst *config.Destination,
 ) (
 	crname.Reference, cr.Image, cr.ImageIndex, error,
 ) {
 	l := logutils.LoggerFromContext(ctx)
 
-	var z *zip.ReadCloser
-	{ // open archive
-		_z, err := zip.OpenReader(zname)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to open zip file: %w", err)
-		}
-		defer _z.Close()
-		z = _z
-	}
-
 	errs := make([]error, 0)
 
 	var containers = make(map[string]*container, 0)
 	var indexManifest *cr.IndexManifest
 	{ // get index and images
-		for _, f := range z.File {
+		for _, f := range stream.File {
 			if f.FileInfo().IsDir() {
 				continue
 			}
@@ -203,7 +193,7 @@ func (s *Server) prepareImageForUpload(
 		}
 	}
 	if len(containers) == 0 {
-		l.Debug("No matching platforms, skipping...")
+		l.Info("No matching platforms, skipping...")
 		return nil, nil, nil, utils.FlattenErrors(errs)
 	}
 
