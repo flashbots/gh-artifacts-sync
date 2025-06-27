@@ -82,7 +82,9 @@ func (s *Server) prepareIndexManifestForDestination(
 	indexManifest.Manifests = make([]cr.Descriptor, 0, len(images)+len(attestations))
 	for digest, image := range images {
 		indexManifest.Manifests = append(indexManifest.Manifests, *image)
-		indexManifest.Manifests = append(indexManifest.Manifests, *attestations[digest])
+		if attestation, ok := attestations[digest]; ok {
+			indexManifest.Manifests = append(indexManifest.Manifests, *attestation)
+		}
 	}
 
 	return utils.FlattenErrors(errs)
