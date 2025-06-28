@@ -61,13 +61,13 @@ func (s *Server) webhook(w http.ResponseWriter, r *http.Request) {
 		return
 
 	case *github.RegistryPackageEvent:
-		err = s.processRegistryPackageEvent(r.Context(), e)
+		err = s.webhookProcessRegistryPackageEvent(r.Context(), e)
 
 	case *github.ReleaseEvent:
-		err = s.processReleaseEvent(r.Context(), e)
+		err = s.webhookProcessReleaseEvent(r.Context(), e)
 
 	case *github.WorkflowRunEvent:
-		err = s.processWorkflowEvent(r.Context(), e)
+		err = s.webhookProcessWorkflowEvent(r.Context(), e)
 
 	}
 
@@ -81,7 +81,7 @@ func (s *Server) webhook(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) processRegistryPackageEvent(ctx context.Context, e *github.RegistryPackageEvent) error {
+func (s *Server) webhookProcessRegistryPackageEvent(ctx context.Context, e *github.RegistryPackageEvent) error {
 	l := logutils.LoggerFromContext(ctx)
 
 	if err := s.sanitiseRegistryPackageEvent(e); err != nil {
@@ -145,7 +145,7 @@ func (s *Server) processRegistryPackageEvent(ctx context.Context, e *github.Regi
 	return nil
 }
 
-func (s *Server) processReleaseEvent(ctx context.Context, e *github.ReleaseEvent) error {
+func (s *Server) webhookProcessReleaseEvent(ctx context.Context, e *github.ReleaseEvent) error {
 	l := logutils.LoggerFromContext(ctx)
 
 	if err := s.sanitiseReleaseEvent(e); err != nil {
@@ -245,7 +245,7 @@ func (s *Server) processReleaseEvent(ctx context.Context, e *github.ReleaseEvent
 	return utils.FlattenErrors(errs)
 }
 
-func (s *Server) processWorkflowEvent(ctx context.Context, e *github.WorkflowRunEvent) error {
+func (s *Server) webhookProcessWorkflowEvent(ctx context.Context, e *github.WorkflowRunEvent) error {
 	l := logutils.LoggerFromContext(ctx)
 
 	if err := s.sanitiseWorkflowEvent(e); err != nil {
@@ -308,11 +308,4 @@ func (s *Server) processWorkflowEvent(ctx context.Context, e *github.WorkflowRun
 	)
 
 	return nil
-}
-
-func must(str *string) string {
-	if str == nil {
-		return ""
-	}
-	return *str
 }

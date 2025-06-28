@@ -14,10 +14,12 @@ import (
 	"github.com/flashbots/gh-artifacts-sync/utils"
 	"go.uber.org/zap"
 
+	crauthn "github.com/google/go-containerregistry/pkg/authn"
 	crname "github.com/google/go-containerregistry/pkg/name"
 	cr "github.com/google/go-containerregistry/pkg/v1"
 	crempty "github.com/google/go-containerregistry/pkg/v1/empty"
 	crmutate "github.com/google/go-containerregistry/pkg/v1/mutate"
+	crremote "github.com/google/go-containerregistry/pkg/v1/remote"
 	crtarball "github.com/google/go-containerregistry/pkg/v1/tarball"
 )
 
@@ -28,45 +30,60 @@ type container struct {
 	manifest *cr.Manifest
 }
 
-func (s *Server) prepareIndexManifestForDestination(
+func (s *Server) dockerExtractImagesAndAttestations(
+	indexManifest *cr.IndexManifest,
+) (images map[string]*cr.Descriptor, attestations map[string]*cr.Descriptor, err error) {
+	if indexManifest == nil {
+		return nil, nil, nil
+	}
+
+	images = make(map[string]*cr.Descriptor, 0)
+	attestations = make(map[string]*cr.Descriptor, 0)
+
+	errs := make([]error, 0)
+	for _, desc := range indexManifest.Manifests {
+		if desc.Annotations["vnd.docker.reference.type"] != "attestation-manifest" {
+			images[desc.Digest.String()] = &desc
+			continue
+		}
+
+		digest := desc.Annotations["vnd.docker.reference.digest"]
+		if digest == "" {
+			err := fmt.Errorf("index contains reference w/o digest: %s",
+				desc.Digest.String(),
+			)
+			errs = append(errs, err)
+			continue
+		}
+
+		if another, collision := attestations[digest]; collision {
+			err := fmt.Errorf("index contains multiple attestations for the same reference: %s: %s vs. %s",
+				digest, desc.Digest.String(), another.Digest.String(),
+			)
+			errs = append(errs, err)
+			continue
+		}
+
+		attestations[digest] = &desc
+	}
+
+	return images, attestations, utils.FlattenErrors(errs)
+}
+
+func (s *Server) dockerFilterIndexManifest(
 	indexManifest *cr.IndexManifest,
 	dst *config.Destination,
 ) error {
-	if indexManifest == nil || dst == nil {
-		return nil
-	}
-
 	var (
-		attestations = make(map[string]*cr.Descriptor, 0)
-		images       = make(map[string]*cr.Descriptor, 0)
-		errs         = make([]error, 0)
+		attestations map[string]*cr.Descriptor
+		images       map[string]*cr.Descriptor
+		err          error
 	)
 
 	{ // separate images from their respective attestations
-		for _, desc := range indexManifest.Manifests {
-			if desc.Annotations["vnd.docker.reference.type"] != "attestation-manifest" {
-				images[desc.Digest.String()] = &desc
-				continue
-			}
-
-			digest := desc.Annotations["vnd.docker.reference.digest"]
-			if digest == "" {
-				err := fmt.Errorf("index contains reference w/o digest: %s",
-					desc.Digest.String(),
-				)
-				errs = append(errs, err)
-				continue
-			}
-
-			if another, collision := attestations[digest]; collision {
-				err := fmt.Errorf("index contains multiple attestations for the same reference: %s: %s vs. %s",
-					digest, desc.Digest.String(), another.Digest.String(),
-				)
-				errs = append(errs, err)
-				continue
-			}
-
-			attestations[digest] = &desc
+		images, attestations, err = s.dockerExtractImagesAndAttestations(indexManifest)
+		if len(images) == 0 && len(attestations) == 0 {
+			return err
 		}
 	}
 
@@ -87,10 +104,10 @@ func (s *Server) prepareIndexManifestForDestination(
 		}
 	}
 
-	return utils.FlattenErrors(errs)
+	return nil
 }
 
-func (s *Server) prepareImageForUpload(
+func (s *Server) dockerPrepareImage(
 	ctx context.Context,
 	j job.UploadableContainer,
 	stream *zip.ReadCloser,
@@ -131,7 +148,7 @@ func (s *Server) prepareImageForUpload(
 				}
 
 			case ".tar":
-				image, err := crtarball.Image(zipFileOpener(f), nil)
+				image, err := crtarball.Image(helperZipFileOpener(f), nil)
 				if err != nil {
 					l.Error("Failed to open container tarball", zap.Error(err))
 					errs = append(errs, err)
@@ -172,7 +189,7 @@ func (s *Server) prepareImageForUpload(
 		}
 	}
 
-	{ // filter platforms
+	{ // filter by platform
 		switch indexManifest {
 		case nil:
 			for originalDigest, container := range containers {
@@ -182,7 +199,7 @@ func (s *Server) prepareImageForUpload(
 			}
 
 		default:
-			if err := s.prepareIndexManifestForDestination(indexManifest, dst); err != nil {
+			if err := s.dockerFilterIndexManifest(indexManifest, dst); err != nil {
 				errs = append(errs, err)
 			}
 			_containers := make(map[string]*container)
@@ -194,6 +211,7 @@ func (s *Server) prepareImageForUpload(
 			containers = _containers
 		}
 	}
+
 	if len(containers) == 0 {
 		l.Info("No matching platforms, skipping...")
 		return nil, nil, nil, utils.FlattenErrors(errs)
@@ -223,29 +241,138 @@ func (s *Server) prepareImageForUpload(
 	}
 
 	var index cr.ImageIndex = crempty.Index
-	for _, desc := range indexManifest.Manifests {
-		originalDigest := desc.Digest.String()
-		container := containers[originalDigest]
-		annotations := desc.Annotations
+	{ // prepare container index
+		for _, desc := range indexManifest.Manifests {
+			originalDigest := desc.Digest.String()
+			container := containers[originalDigest]
+			annotations := desc.Annotations
 
-		if annotations["vnd.docker.reference.type"] == "attestation-manifest" {
-			if annotationOriginalDigest, ok := annotations["vnd.docker.reference.digest"]; ok {
-				if reference, ok := containers[annotationOriginalDigest]; ok {
-					annotations["vnd.docker.reference.digest"] = reference.digest.String()
+			if annotations["vnd.docker.reference.type"] == "attestation-manifest" {
+				if originalReferenceDigest, ok := annotations["vnd.docker.reference.digest"]; ok {
+					if reference, ok := containers[originalReferenceDigest]; ok {
+						annotations["vnd.docker.reference.digest"] = reference.digest.String()
+					}
 				}
 			}
+
+			index = crmutate.AppendManifests(index, crmutate.IndexAddendum{
+				Add: container.image,
+
+				Descriptor: cr.Descriptor{
+					Annotations: annotations,
+					Digest:      container.digest,
+					Platform:    container.config.Platform(),
+				},
+			})
 		}
+	}
+	return ref, nil, index, utils.FlattenErrors(errs)
+}
 
-		index = crmutate.AppendManifests(index, crmutate.IndexAddendum{
-			Add: container.image,
+func (s *Server) dockerTagRemoteSubImages(
+	ctx context.Context,
+	ref crname.Reference,
+	auth crauthn.Authenticator,
+) error {
+	l := logutils.LoggerFromContext(ctx)
 
-			Descriptor: cr.Descriptor{
-				Annotations: annotations,
-				Digest:      container.digest,
-				Platform:    container.config.Platform(),
-			},
-		})
+	desc, err := crremote.Get(ref, crremote.WithAuth(auth))
+	if err != nil {
+		return fmt.Errorf("failed to get a descriptor for container image: %s: %w",
+			ref.Name(), err,
+		)
 	}
 
-	return ref, nil, index, utils.FlattenErrors(errs)
+	if !desc.MediaType.IsIndex() {
+		return nil
+	}
+
+	index, err := crremote.Index(ref, crremote.WithAuth(auth))
+	if err != nil {
+		return fmt.Errorf("failed to retrieve container index: %s: %w",
+			ref.Name(), err,
+		)
+	}
+
+	indexManifest, err := index.IndexManifest()
+	if err != nil {
+		return fmt.Errorf("failed to get image index manifest from a descriptor: %s: %s: %w",
+			ref.Name(), desc.Digest.String(), err,
+		)
+	}
+
+	l.Debug("Downloaded an index",
+		zap.String("digest", desc.Digest.String()),
+		zap.String("reference", ref.Name()),
+		zap.Any("annotations", indexManifest.Annotations),
+	)
+
+	images, attestations, err := s.dockerExtractImagesAndAttestations(indexManifest)
+	if len(images) == 0 && len(attestations) == 0 {
+		return err
+	}
+
+	errs := make([]error, 0)
+	for _, desc := range images {
+		image, err := index.Image(desc.Digest)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to get image from an index: %s: %s: %w",
+				ref.Name(), desc.Digest.String(), err,
+			))
+			continue
+		}
+
+		_tag := fmt.Sprintf("%s:%s-%s-%s",
+			ref.Context().Name(), ref.Identifier(), desc.Platform.OS, desc.Platform.Architecture,
+		)
+		tag, err := crname.NewTag(_tag)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to parse a tag: %s: %w",
+				_tag, err,
+			))
+			continue
+		}
+
+		if err := crremote.Tag(tag, image, crremote.WithAuth(auth)); err != nil {
+			errs = append(errs, fmt.Errorf("failed to tag sub-image: %s: %w",
+				_tag, err,
+			))
+			continue
+		}
+	}
+
+	for digest, desc := range attestations {
+		reference, ok := images[digest]
+		if !ok {
+			continue
+		}
+
+		image, err := index.Image(desc.Digest)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to get image from an index: %s: %s: %w",
+				ref.Name(), desc.Digest.String(), err,
+			))
+			continue
+		}
+
+		_tag := fmt.Sprintf("%s:%s-%s-%s-attestation",
+			ref.Context().Name(), ref.Identifier(), reference.Platform.OS, reference.Platform.Architecture,
+		)
+		tag, err := crname.NewTag(_tag)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to parse a tag: %s: %w",
+				_tag, err,
+			))
+			continue
+		}
+
+		if err := crremote.Tag(tag, image, crremote.WithAuth(auth)); err != nil {
+			errs = append(errs, fmt.Errorf("failed to tag sub-image: %s: %w",
+				_tag, err,
+			))
+			continue
+		}
+	}
+
+	return utils.FlattenErrors(errs)
 }

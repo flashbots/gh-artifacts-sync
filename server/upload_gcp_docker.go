@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"time"
 
 	"github.com/flashbots/gh-artifacts-sync/config"
@@ -18,7 +17,6 @@ import (
 	crauthn "github.com/google/go-containerregistry/pkg/authn"
 	crremote "github.com/google/go-containerregistry/pkg/v1/remote"
 	crtransport "github.com/google/go-containerregistry/pkg/v1/remote/transport"
-	crtarball "github.com/google/go-containerregistry/pkg/v1/tarball"
 )
 
 func (s *Server) uploadFromZipToGcpArtifactRegistryDocker(
@@ -28,6 +26,11 @@ func (s *Server) uploadFromZipToGcpArtifactRegistryDocker(
 	dst *config.Destination,
 ) error {
 	l := logutils.LoggerFromContext(ctx)
+
+	if j.IsTagless() {
+		l.Info("Image is tag-less, skipping...")
+		return nil
+	}
 
 	var z *zip.ReadCloser
 	{ // open archive
@@ -39,7 +42,7 @@ func (s *Server) uploadFromZipToGcpArtifactRegistryDocker(
 		z = _z
 	}
 
-	ref, image, index, err := s.prepareImageForUpload(ctx, j, z, dst)
+	ref, image, index, err := s.dockerPrepareImage(ctx, j, z, dst)
 	if ref == nil || (image == nil && index == nil) {
 		if err != nil {
 			l.Error("Failed to prepare image for upload", zap.Error(err))
@@ -91,13 +94,15 @@ func (s *Server) uploadFromZipToGcpArtifactRegistryDocker(
 		return uploadErr
 	}
 
+	{ // tag images referred by the index at the destination
+		if index != nil {
+			if err := s.dockerTagRemoteSubImages(ctx, ref, auth); err != nil {
+				l.Warn("Failed to tag sub-images of the container index", zap.Error(err))
+			}
+		}
+	}
+
 	l.Info("Pushed container image to the destination")
 
 	return nil
-}
-
-func zipFileOpener(zf *zip.File) crtarball.Opener {
-	return func() (io.ReadCloser, error) {
-		return zf.Open()
-	}
 }

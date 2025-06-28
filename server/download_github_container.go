@@ -96,9 +96,11 @@ func (s *Server) downloadGithubContainer(
 	{ // get images
 		switch {
 		case desc.MediaType.IsImage():
-			img, err := crremote.Image(ref, crremote.WithAuth(auth))
+			image, err := crremote.Image(ref, crremote.WithAuth(auth))
 			if err != nil {
-				return "", fmt.Errorf("failed to retrieve container image: %w", err)
+				return "", fmt.Errorf("failed to retrieve container image: %s: %w",
+					j.GetPackageUrl(), err,
+				)
 			}
 
 			platform := "unknown/unknown"
@@ -109,7 +111,7 @@ func (s *Server) downloadGithubContainer(
 				images[platform] = make([]cr.Image, 0)
 			}
 
-			images[platform] = append(images[platform], img)
+			images[platform] = append(images[platform], image)
 
 			l.Debug("Downloaded a manifest",
 				zap.String("digest", desc.Digest.String()),
@@ -120,7 +122,9 @@ func (s *Server) downloadGithubContainer(
 		case desc.MediaType.IsIndex():
 			index, err := crremote.Index(ref, crremote.WithAuth(auth))
 			if err != nil {
-				return "", fmt.Errorf("failed to retrieve container index: %w", err)
+				return "", fmt.Errorf("failed to retrieve container index: %s: %w",
+					j.GetPackageUrl(), err,
+				)
 			}
 
 			indexManifest, err = index.IndexManifest()
@@ -141,7 +145,7 @@ func (s *Server) downloadGithubContainer(
 					continue
 				}
 
-				img, err := index.Image(desc.Digest)
+				image, err := index.Image(desc.Digest)
 				if err != nil {
 					return "", fmt.Errorf("failed to get image from an index: %s: %s: %w",
 						j.GetPackageUrl(), desc.Digest, err,
@@ -156,7 +160,7 @@ func (s *Server) downloadGithubContainer(
 					images[platform] = make([]cr.Image, 0)
 				}
 
-				images[platform] = append(images[platform], img)
+				images[platform] = append(images[platform], image)
 
 				l.Debug("Downloaded a manifest",
 					zap.String("digest", desc.Digest.String()),

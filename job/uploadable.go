@@ -12,6 +12,7 @@ type UploadableFile interface {
 }
 
 type UploadableContainer interface {
+	IsTagless() bool
 	GetDestinations() []*config.Destination
 	GetDestinationReference(*config.Destination) string
 	GetTag() string

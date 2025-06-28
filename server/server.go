@@ -87,13 +87,13 @@ func (s *Server) Run() error {
 
 	go func() {
 		for j := range s.jobs {
-			s.handleJob(ctx, j)
+			s.schedulerHandleJob(ctx, j)
 		}
 	}()
 
 	go func() { // run the job ticker
 		for {
-			s.scheduleJobs(<-s.ticker.C)
+			s.schedulerIngestJobs(<-s.ticker.C)
 		}
 	}()
 

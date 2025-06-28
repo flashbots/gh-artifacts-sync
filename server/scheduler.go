@@ -13,7 +13,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func (s *Server) scheduleJobs(_ time.Time) {
+func (s *Server) schedulerIngestJobs(_ time.Time) {
 	l := s.logger
 
 	if count := s.jobInFlight.Load(); count > 0 {
@@ -50,7 +50,7 @@ func (s *Server) scheduleJobs(_ time.Time) {
 	}
 }
 
-func (s *Server) handleJob(ctx context.Context, j job.Job) {
+func (s *Server) schedulerHandleJob(ctx context.Context, j job.Job) {
 	defer s.jobInFlight.Sub(1)
 
 	l := logutils.LoggerFromContext(ctx).With(

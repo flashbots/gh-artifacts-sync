@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/flashbots/gh-artifacts-sync/config"
+	"github.com/flashbots/gh-artifacts-sync/utils"
 	"github.com/google/go-github/v72/github"
 )
 
@@ -53,15 +54,37 @@ func (j *SyncContainerRegistryPackage) meta() *Meta {
 	return j.Meta
 }
 
+func (j *SyncContainerRegistryPackage) IsTagless() bool {
+	if j == nil ||
+		j.Package == nil ||
+		j.Package.PackageVersion == nil ||
+		j.Package.PackageVersion.ContainerMetadata == nil ||
+		j.Package.PackageVersion.ContainerMetadata.Tag == nil ||
+		j.Package.PackageVersion.ContainerMetadata.Tag.Name == nil {
+		// ---
+		return true
+	}
+	return *j.Package.PackageVersion.ContainerMetadata.Tag.Name == ""
+}
+
 func (j *SyncContainerRegistryPackage) GetDestinations() []*config.Destination {
 	return j.Destinations
 }
 
 func (j *SyncContainerRegistryPackage) GetDestinationReference(dst *config.Destination) string {
-	tag := *j.Package.PackageVersion.ContainerMetadata.Tag.Name
+	if j == nil ||
+		j.Package == nil ||
+		j.Package.PackageVersion == nil ||
+		j.Package.PackageVersion.ContainerMetadata == nil ||
+		j.Package.PackageVersion.ContainerMetadata.Tag == nil {
+		// ---
+		return ""
+	}
+
+	tag := utils.MustString(j.Package.PackageVersion.ContainerMetadata.Tag.Name)
 	if tag == "" {
 		tag = strings.ReplaceAll(
-			*j.Package.PackageVersion.ContainerMetadata.Tag.Digest, ":", "-",
+			utils.MustString(j.Package.PackageVersion.ContainerMetadata.Tag.Digest), ":", "-",
 		)
 	}
 	return dst.Path + "/" + dst.Package + ":" + tag
