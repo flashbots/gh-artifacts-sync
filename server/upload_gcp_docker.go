@@ -72,6 +72,7 @@ func (s *Server) uploadFromZipToGcpArtifactRegistryDocker(
 	)
 
 	l.Debug("Pushing container to the destination")
+
 	var uploadErr error
 	{ // push
 		switch {

@@ -30,7 +30,7 @@ func (s *Server) downloadGithubRelease(
 	var fname string
 	{ // download
 		fname = filepath.Join(downloadsDir, j.GetAssetName())
-		if err := s.downloadGithubUrl(ctx, *j.Asset.URL, fname, time.Minute); err != nil {
+		if err := s.downloadUrl(ctx, s.github.Client(), *j.Asset.URL, fname, time.Minute); err != nil {
 			return "", fmt.Errorf("failed to download an asset: %w", err)
 		}
 	}

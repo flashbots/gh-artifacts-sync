@@ -333,12 +333,20 @@ func (s *Server) dockerTagRemoteSubImages(
 			continue
 		}
 
+		l.Debug("Tagging sub-image",
+			zap.String("destination_sub_reference", _tag),
+		)
+
 		if err := crremote.Tag(tag, image, crremote.WithAuth(auth)); err != nil {
 			errs = append(errs, fmt.Errorf("failed to tag sub-image: %s: %w",
 				_tag, err,
 			))
 			continue
 		}
+
+		l.Info("Tagged sub-image",
+			zap.String("destination_sub_reference", _tag),
+		)
 	}
 
 	for digest, desc := range attestations {
@@ -366,12 +374,20 @@ func (s *Server) dockerTagRemoteSubImages(
 			continue
 		}
 
+		l.Debug("Tagging sub-image",
+			zap.String("destination_sub_reference", _tag),
+		)
+
 		if err := crremote.Tag(tag, image, crremote.WithAuth(auth)); err != nil {
 			errs = append(errs, fmt.Errorf("failed to tag sub-image: %s: %w",
 				_tag, err,
 			))
 			continue
 		}
+
+		l.Info("Tagged sub-image",
+			zap.String("destination_sub_reference", _tag),
+		)
 	}
 
 	return utils.FlattenErrors(errs)

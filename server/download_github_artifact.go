@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -30,11 +31,11 @@ func (s *Server) downloadGithubArtifact(
 
 	var downloadLink string
 	{ // get the download link
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
 
 		_url, _, err := s.github.Actions.DownloadArtifact(
-			ctx, j.GetRepoOwner(), j.GetRepoFullName(), j.GetArtifactID(), 16,
+			ctx, j.GetRepoOwner(), j.GetRepo(), j.GetArtifactID(), 16,
 		)
 		if err != nil {
 			return "", fmt.Errorf("failed to get the download link: %w", err)
@@ -45,7 +46,7 @@ func (s *Server) downloadGithubArtifact(
 	var fname string
 	{ // download
 		fname = filepath.Join(downloadsDir, j.GetArtifactName())
-		if err := s.downloadGithubUrl(ctx, downloadLink, fname, time.Minute); err != nil {
+		if err := s.downloadUrl(ctx, http.DefaultClient, downloadLink, fname, time.Minute); err != nil {
 			return "", fmt.Errorf("failed to download an artifact: %w", err)
 		}
 	}

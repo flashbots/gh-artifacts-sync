@@ -22,7 +22,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 )
 
-replace github.com/bradleyfalzon/ghinstallation/v2 => github.com/0x416e746f6e/ghinstallation/v2 v2.16.1-dev
+replace github.com/bradleyfalzon/ghinstallation/v2 => github.com/0x416e746f6e/ghinstallation/v2 v2.16.1-dev-2
 
 require (
 	cloud.google.com/go/auth v0.16.2 // indirect

@@ -14,8 +14,9 @@ import (
 	"go.uber.org/zap"
 )
 
-func (s *Server) downloadGithubUrl(
+func (s *Server) downloadUrl(
 	ctx context.Context,
+	cli *http.Client,
 	url, fname string,
 	timeout time.Duration,
 ) error {
@@ -34,7 +35,7 @@ func (s *Server) downloadGithubUrl(
 			return fmt.Errorf("failed to create http request: %w", err)
 		}
 		req.Header.Add("accept", "application/octet-stream")
-		res, err := s.github.Client().Do(req)
+		res, err := cli.Do(req)
 		if err == nil && res.StatusCode != http.StatusOK {
 			err = fmt.Errorf("unexpected http status: %d", res.StatusCode)
 		}
