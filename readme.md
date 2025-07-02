@@ -20,7 +20,8 @@ Supported destinations:
 
 github:
   webhook_secret: sss  # configured during gh app installation
-                       # see also: --github-webhook-secret, --github-webhook-secret-path
+                       # see also: --github-webhook-secret
+                       #           --github-webhook-secret-path
   app:
     id: nnn               # assigned on gh app creation
     installation_id: mmm  # assigned after gh app installation
@@ -36,22 +37,61 @@ log:
   level: info  # or debug, warn, error, etc (see golang zap)
   mode: dev    # or prod for json format
 
-harvest:
-  ${ORGANISATION}/${REPO}:
-    ${GH_WORKFLOW_FILENAME}:
-      artifacts:
-        super-cool-app-(\w+)-aarch64-unknown-linux-gnu:  # (\w+) captures version from artifact name
-          destinations:
-            - type: gcp.artifactregistry.generic
-              path: projects/${GCP_PROJECT}$/locations/${GCP_REGION}/repositories/binary
-              package: ${ORGANISATION}.super-cool-app.aarch64
+repositories:
+  org/repo:
+    #
+    # releases section configures synchronisation from published releases
+    #
+    releases:
+      (v\d+\.\d+\.\d+):  # match + capture version
+        accept_drafts:      false
+        accept_prereleases: false
 
-        super-cool-app-(\w+)-x86_64-unknown-linux-gnu:
-          destinations:
-            - type: gcp.artifactregistry.generic
-              path: projects/${GCP_PROJECT}$/locations/${GCP_REGION}/repositories/binary
-              package: ${ORGANISATION}.super-cool-app.x86_64
-```
+        assets:
+          super-cool-app-aarch64-unknown-linux-gnu.zip:  # match only
+            destinations:
+              - type: gcp.artifactregistry.generic
+                path: projects/${GCP_PROJECT}$/locations/${GCP_REGION}/repositories/generic
+                package: ${ORGANISATION}.super-cool-app.aarch64
+
+          super-cool-app-x86_64-unknown-linux-gnu.zip:
+            destinations:
+              - type: gcp.artifactregistry.generic
+                path: projects/${GCP_PROJECT}$/locations/${GCP_REGION}/repositories/generic
+                package: ${ORGANISATION}.super-cool-app.x86_64
+
+    #
+    # containers section configures synchronisation from github packages
+    # (with ecosystem type `CONTAINER`).  multiplatform images are supported.
+    # attested images are supported as well.
+    #
+    containers:
+      super-cool-app:
+        destinations:
+          - type: gcp.artifactregistry.docker
+            path: ${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT}/${REPO}
+            package: super-cool-app
+            platforms: [ linux/amd64, linux/arm64 ]  # only sync these platforms
+
+    #
+    # workflows section configures synchronisation from the artifacts uploaded
+    # by github workflows (those available on workflow run summary page)
+    #
+    workflows:
+      release.yaml:
+        artifacts:
+          actors: [ user1, user2 ]  # only consider runs triggered by these users
+          super-cool-app-(\w+)-aarch64-unknown-linux-gnu:  # match + capture version
+            destinations:
+              - type: gcp.artifactregistry.generic
+                path: projects/${GCP_PROJECT}$/locations/${GCP_REGION}/repositories/generic
+                package: ${ORGANISATION}.super-cool-app.aarch64
+
+          super-cool-app-(\w+)-x86_64-unknown-linux-gnu:
+            destinations:
+              - type: gcp.artifactregistry.generic
+                path: projects/${GCP_PROJECT}$/locations/${GCP_REGION}/repositories/generic
+                package: ${ORGANISATION}.super-cool-app.x86_64
 
 ## CLI parameters
 
@@ -61,6 +101,12 @@ NAME:
 
 USAGE:
    gh-artifacts-sync serve [command options]
+
+GLOBAL OPTIONS:
+   --config path                         path to the configuration file
+   --log-level value, --log.level value  logging level (default: "info") [$GH_ARTIFACTS_SYNC_LOG_LEVEL]
+   --log-mode value, --log.mode value    logging mode (default: "prod") [$GH_ARTIFACTS_SYNC_LOG_MODE]
+   --version, -v                         print the version
 
 OPTIONS:
    DIR
