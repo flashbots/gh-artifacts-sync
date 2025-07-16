@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/flashbots/gh-artifacts-sync/logutils"
+	"github.com/flashbots/gh-artifacts-sync/utils"
 
 	"go.uber.org/zap"
 )
@@ -38,6 +39,9 @@ func (s *Server) downloadUrl(
 		res, err := cli.Do(req)
 		if err == nil && res.StatusCode != http.StatusOK {
 			err = fmt.Errorf("unexpected http status: %d", res.StatusCode)
+			if res.StatusCode == http.StatusNotFound {
+				err = utils.DoNotRetry(err)
+			}
 		}
 		if err != nil {
 			return fmt.Errorf("failed to execute http request: %w", err)

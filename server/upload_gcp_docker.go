@@ -89,7 +89,7 @@ func (s *Server) uploadFromZipToGcpArtifactRegistryDocker(
 
 		transportErr := &crtransport.Error{}
 		if errors.As(uploadErr, &transportErr) && !transportErr.Temporary() {
-			uploadErr = utils.NoRetry(uploadErr)
+			uploadErr = utils.DoNotRetry(uploadErr)
 		}
 
 		return uploadErr

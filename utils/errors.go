@@ -4,7 +4,7 @@ type NonRetryableError struct {
 	err error
 }
 
-func NoRetry(err error) error {
+func DoNotRetry(err error) error {
 	return &NonRetryableError{err: err}
 }
 
