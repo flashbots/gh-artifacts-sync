@@ -16,7 +16,7 @@ import (
 	"github.com/flashbots/gh-artifacts-sync/job"
 	"github.com/flashbots/gh-artifacts-sync/logutils"
 	"github.com/flashbots/gh-artifacts-sync/utils"
-	"github.com/google/go-github/v72/github"
+	"github.com/google/go-github/v73/github"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/prometheus/client_golang/prometheus/promhttp"

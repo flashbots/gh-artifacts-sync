@@ -5,7 +5,7 @@ import (
 	"math/rand/v2"
 	"strings"
 
-	"github.com/google/go-github/v72/github"
+	"github.com/google/go-github/v73/github"
 )
 
 const TypeDiscoverWorkflowArtifacts = "discover-workflow-artifacts"

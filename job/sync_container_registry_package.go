@@ -7,7 +7,7 @@ import (
 
 	"github.com/flashbots/gh-artifacts-sync/config"
 	"github.com/flashbots/gh-artifacts-sync/utils"
-	"github.com/google/go-github/v72/github"
+	"github.com/google/go-github/v73/github"
 )
 
 const TypeSyncContainerRegistryPackage = "sync-container-registry-package"

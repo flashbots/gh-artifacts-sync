@@ -8,7 +8,7 @@ import (
 	"github.com/flashbots/gh-artifacts-sync/job"
 	"github.com/flashbots/gh-artifacts-sync/logutils"
 	"github.com/flashbots/gh-artifacts-sync/utils"
-	"github.com/google/go-github/v72/github"
+	"github.com/google/go-github/v73/github"
 	"go.uber.org/zap"
 )
 
