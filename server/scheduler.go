@@ -34,6 +34,11 @@ func (s *Server) schedulerIngestJobs(_ time.Time) {
 		if d.IsDir() {
 			return nil
 		}
+		if filepath.Ext(path) != ".json" {
+			// renameio firstly creates files like `.{fname}NNNNNNNNNNNNNNNNNNN`
+			// that we should ignore
+			return nil
+		}
 		j, err := job.Load(path)
 		if err != nil {
 			j = job.NewCleanupUnparseableJob(path, err)
