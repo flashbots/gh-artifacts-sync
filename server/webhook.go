@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/flashbots/gh-artifacts-sync/job"
 	"github.com/flashbots/gh-artifacts-sync/logutils"
@@ -124,6 +125,12 @@ func (s *Server) webhookProcessRegistryPackageEvent(ctx context.Context, e *gith
 		return nil
 	}
 
+	if e.Repository.PushedAt != nil && time.Since(e.Repository.PushedAt.Time) > time.Minute {
+		l.Warn("Github event was delivered late",
+			zap.Duration("delay", time.Since(e.Repository.PushedAt.Time)),
+		)
+	}
+
 	j := job.NewSyncContainerRegistryPackage(
 		e.RegistryPackage,
 		e.Repository,
@@ -172,6 +179,12 @@ func (s *Server) webhookProcessReleaseEvent(ctx context.Context, e *github.Relea
 	if !repoIsConfigured {
 		l.Info("Ignoring release event b/c we don't have configuration for this repo")
 		return nil
+	}
+
+	if e.Release.PublishedAt != nil && time.Since(e.Release.PublishedAt.Time) > time.Minute {
+		l.Warn("Github event was delivered late",
+			zap.Duration("delay", time.Since(e.Release.PublishedAt.Time)),
+		)
 	}
 
 	errs := make([]error, 0)
@@ -294,6 +307,12 @@ func (s *Server) webhookProcessWorkflowEvent(ctx context.Context, e *github.Work
 			zap.String("actor", *e.WorkflowRun.TriggeringActor.Login),
 		)
 		return nil
+	}
+
+	if e.Repo.PushedAt != nil && time.Since(e.Repo.PushedAt.Time) > time.Minute {
+		l.Warn("Github event was delivered late",
+			zap.Duration("delay", time.Since(e.Repo.PushedAt.Time)),
+		)
 	}
 
 	fname, err := job.Save(job.NewDiscoverWorkflowArtifacts(e), s.cfg.Dir.Jobs)
